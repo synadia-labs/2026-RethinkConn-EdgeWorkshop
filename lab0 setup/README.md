@@ -74,4 +74,10 @@ If so, clean them up too:
 killall nats
 ```
 
+For tests using JetStreams, a final cleanup of stores is needed:
+
+```sh
+rm -Rf ./js
+```
+
 ---

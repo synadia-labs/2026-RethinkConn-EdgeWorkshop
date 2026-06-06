@@ -29,6 +29,6 @@ nats --context sysl1 server ls
 
 There are other server initiated events (`$SYS.ACCOUNT.>`, `$SYS.SERVER.>` for example) that you should consider blocking from going down to the leafs.
 
-In general, *block everything and then unblock just what you need* is the best way to proceed!
+In general, *block everything leaf-hub and then unblock just what is needed* is the best way to proceed!
 
 ---
