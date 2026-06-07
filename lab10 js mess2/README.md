@@ -1,4 +1,4 @@
-# Lab #11 - Another little mess with JetStreams (Domain lottery)
+# Lab #10 - Another little mess with JetStreams (Domain lottery)
 
 - Hub + leafs, East-West blocked (isolate:true and also explicit block for `telemtry.>` subject)
 - Each leaf has its own TELEMETRY stream (same name, same capture pattern)

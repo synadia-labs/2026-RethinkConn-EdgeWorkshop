@@ -1,6 +1,6 @@
-# Lab #9 SYS account leaf connection with restrictions
+# Lab #8 SYS account leaf connection with restrictions
 
-- Similar to Lab #8, but limiting leaf<-->hub accesible services
+- Similar to Lab #7, but limiting leaf<-->hub accesible services
 
 Using permissions we can fine tune what should be shared and in what direction, both for security reasons *and/or* data volume concerns.
 

@@ -1,4 +1,4 @@
-# Lab #10 - A little mess with JetStreams (captured subjects leak)
+# Lab #9 - A little mess with JetStreams (captured subjects leak)
 
 - Hub + leafs, different cluster names, East-West enabled
 - No restrictions on permission North-South

@@ -1,4 +1,4 @@
-# Lab #8 SYS account leaf connection
+# Lab #7 SYS account leaf connection
 
 - Leaf connect the system account in addition to the application account
 - Opens the door to monitor from the hub all kind of system events in the leafs, as well as invoking system services
@@ -89,6 +89,6 @@ nats --context sysl1 server ls --trace
 
 All we need to do is limit permissions for the leaf user in the system account to restrict events and service calls as needed.
 
-Next Lab (#9) shows an example with SYS sharing restriction.
+Next Lab (#8) shows an example with SYS sharing restriction.
 
 ---

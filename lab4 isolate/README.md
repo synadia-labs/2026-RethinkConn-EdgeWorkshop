@@ -1,4 +1,4 @@
-# Lab #4 - Isolate
+# Lab #4 - Isolate (East-West)
 
 Leafs using unique cluster names, but we want to disable East-west traffic.
 
