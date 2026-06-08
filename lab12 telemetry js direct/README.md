@@ -5,6 +5,9 @@
 - leaf 2 - hub can only admin consumers of a TELEMETRY stream in the hub (CRUD ops. and push consumer subjects for mirror/source)
 - leaf 3 - very restricted accesss: just to an existing (pre-created) _pull_ consumer in the leaf
 
+Important: $JS.ACK.> (consumer acks) and $JS.FC.> (consumer flow control) are not JS Domain aware. Make sure STREAMNAME+CONSUMERNAME are unique from the hub perspective.
+Placing the leaf JS Domain name as part of the consumer names will meet that requirement.  Mirror/Sourcing will create random consumer names and meet the requirement too.
+
 ---
 
 Create the streams in the leafs
@@ -21,6 +24,9 @@ Some devices in each leaf publish some telemetry
 nats --context l1 pub --jetstream telemetry.device1.temp "1"
 nats --context l2 pub --jetstream telemetry.device2.temp "2"
 nats --context l3 pub --jetstream telemetry.device3.temp "3"
+nats --context l1 pub --jetstream telemetry.device4.temp "4"
+nats --context l2 pub --jetstream telemetry.device5.temp "5"
+nats --context l3 pub --jetstream telemetry.device6.temp "6"
 ```
 
 For leaf 1, the hub can perform all kind of operations
@@ -40,7 +46,7 @@ For leaf 2, the hub can perform only consumer operations in stream TELEMETRY
 ```sh
 nats --context hub --js-domain=L2 stream ls  # this will not work, not allowed to list streams
 nats --context hub --js-domain=L2 stream view TELEMETRY
-nats --context hub --js-domain=L2 stream get TELEMETRY 1   # this will fail because direct get is not enabled
+nats --context hub --js-domain=L2 stream get TELEMETRY 1    # this one will fail unless MSG.GET unblocked
 nats --context hub --js-domain=L2 consumer create TELEMETRY l2-hub-consumer --pull --defaults
 nats --context hub --js-domain=L2 consumer next TELEMETRY l2-hub-consumer --ack
 # the new consumer pause and reset ops (NATS 2.14.x) also works
