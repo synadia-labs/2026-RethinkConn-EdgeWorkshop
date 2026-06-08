@@ -55,6 +55,9 @@ nats-server -c hub.conf &
 nats-server -c l1.conf &
 nats-server -c l2.conf &
 nats-server -c l3.conf &
+
+# make sure they all 4 are running
+jobs
 ```
 
 Make sure to start the servers in the right directory. Each lab will use its own config files (unless otherwise noted).

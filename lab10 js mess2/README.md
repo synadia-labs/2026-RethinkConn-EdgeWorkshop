@@ -66,7 +66,25 @@ We get responses from the 3 leaf nodes, nats-cli will pick whichever gets back f
 As all leafs have the same domain, they listen in the same API `$JS.L.API.>`. The hub is sending the command to all of them.
 If you question why the request is not send to only one of them, round-robin (as with regular dqueue service pools in NATS): this is related to how Domains work internally (using account subject mapping in leaf nodes). It is an internal implementation detail, and could change in the future.
 
-Make sure leaf nodes have a _unique_ domain name!
+Another messy test - Let's create from the hub a stream in the L domain:
+
+```sh
+nats --context hub --js-domain L stream add FOO --subjects="foo.>" --defaults
+```
+
+You'll see just one of the responses returned by nats-cli (random, fastest leaf), but look, we created a stream in every leaf node!!
+
+```sh
+nats --context l1 stream ls
+nats --context l2 stream ls
+nats --context l3 stream ls
+```
+
+Feels like a feature :-D, but is a no-no!!
+
+---
+
+In summary, make sure leaf nodes have a _unique_ domain name!
 
 ---
 

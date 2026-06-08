@@ -71,6 +71,15 @@ jq -r '
 '
 ```
 
+
+Tell all the servers to reload their config:
+
+```sh
+nats --context=syshub request '$SYS.REQ.SERVER.PING' "" --replies=0 --timeout=1s --raw | \
+jq -r .server.id | \
+xargs -I {} nats --context=syshub req \$SYS.REQ.SERVER.{}.RELOAD ''
+```
+
 ---
 
 ## Too much visibility on the leafs? Too many leafs & events? --> limit with permissions
