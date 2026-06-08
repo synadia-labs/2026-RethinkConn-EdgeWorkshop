@@ -1,5 +1,9 @@
 # Lab #12 - Hub remote accesing a stream in leaf
 
+- Hub with restricted access to streams in leafs
+- leaf 1 - hub can access the full JetStream API in the leaf (incl. push consumer subjects)
+- leaf 2 - hub can only admin consumers of a TELEMETRY stream in the hub (CRUD ops. and push consumer subjects for mirror/source)
+- leaf 3 - very restricted accesss: just to an existing (pre-created) _pull_ consumer in the leaf
 
 ---
 
@@ -19,15 +23,46 @@ nats --context l2 pub --jetstream telemetry.device2.temp "2"
 nats --context l3 pub --jetstream telemetry.device3.temp "3"
 ```
 
-Check the content of the streams:
+For leaf 1, the hub can perform all kind of operations
 
+```sh
+nats --context hub --js-domain=L1 stream ls
+nats --context hub --js-domain=L1 stream add FOO --subjects="foo.>" --defaults   # (it can't send data to the foo.> subjects though, as that is not open hub->leaf)
+nats --context l1  pub --jetstream foo.bar "hi"   # so we send data locally at the leaf
+nats --context hub --js-domain=L1 stream view FOO
+# and so on...
+nats --context hub --js-domain=L1 stream rm FOO --force
+nats --context hub --js-domain=L1 stream view TELEMETRY
+```
 
+For leaf 2, the hub can perform only consumer operations in stream TELEMETRY
 
+```sh
+nats --context hub --js-domain=L2 stream ls  # this will not work, not allowed to list streams
+nats --context hub --js-domain=L2 stream view TELEMETRY
+nats --context hub --js-domain=L2 stream get TELEMETRY 1   # this will fail because direct get is not enabled
+nats --context hub --js-domain=L2 consumer create TELEMETRY l2-hub-consumer --pull --defaults
+nats --context hub --js-domain=L2 consumer next TELEMETRY l2-hub-consumer --ack
+# the new consumer pause and reset ops (NATS 2.14.x) also works
+nats --context hub --js-domain=L2 consumer reset TELEMETRY l2-hub-consumer --sequence=0 --force
+nats --context hub --js-domain=L2 consumer pause TELEMETRY l2-hub-consumer 1h --force
+nats --context hub --js-domain=L2 consumer info TELEMETRY l2-hub-consumer
+```
 
+For leaf 3, restrictions are harder, we can just use an existing consumer created locally at the leaf
 
-
+```sh
+# first create the consumer locally in the leaf
 nats --context l3 consumer create TELEMETRY l3-c0 --pull --ack=explicit --defaults
 
+# now the hub can use it
 nats --context hub --js-domain=L3 consumer next TELEMETRY l3-c0 --ack
+nats --context hub --js-domain=L3 consumer info TELEMETRY l3-c0
 
-nats --context hub --js-domain=L3 consumer pause TELEMETRY l3-c0 1h -
+# Reset and pause are not enabled and will not work
+nats --context hub --js-domain=L3 consumer reset TELEMETRY l3-c0 --sequence=0 --force
+nats --context hub --js-domain=L3 consumer pause TELEMETRY l3-c0 1h -force
+# What JetStream API subjects should be allowed to enable the consumer reset & pause operation for l3?
+```
+
+---
