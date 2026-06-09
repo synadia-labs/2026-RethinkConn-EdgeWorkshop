@@ -35,7 +35,7 @@ nats --context l2 pub --jetstream telemetry.device5.temp "5"
 nats --context l3 pub --jetstream telemetry.device6.temp "6"
 ```
 
-Create the consumers in each sourced stream.
+Create the consumers in each sourced stream (note that the `$JS.S.>` subject prefix in the delivery subject is arbitrary. Anything open leaf->hub would work. Using this one here for consistency with previous implementation of sourcing/mirroring)
 
 ```sh
 nats --context l1 consumer create --ack=flow_control --deliver=all --max-pending=999 TELEMETRY l1-hub-src0 --target '$JS.S.TELEMETRY.l1-hub-src0' --defaults
