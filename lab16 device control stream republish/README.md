@@ -1,4 +1,4 @@
-# Lab #xx - Target devices with stream republish
+# Lab #xx - Target devices individually with stream republish
 
 Summary:
 
@@ -9,7 +9,7 @@ Summary:
 
 Limitations:
 
-- No direct support for reply subjects. Reply subjects must be specified in the payload or implicitly defined somewhere else, and published separately.
+- No direct support for reply subjects. Reply subjects must be specified in the payload or implicitly defined somewhere else, and replies published separately.
 
 ---
 
