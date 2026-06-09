@@ -3,6 +3,8 @@
 - Telemetry Store & Forward & Merge in hub stream
 - Minimum set of $JS API subjects to support the sourcing
 - Uses the default sourcing ephemeral consumers and default delivery subjects (`$JS.S.>`)
+- These consumers are special, defined internally and not visible
+- They are not good when sourcing interest/workqueue streams (check next lab for that)
 
 ---
 
@@ -34,3 +36,5 @@ nats --context hub stream report
 ```
 
 ---
+
+Next lab does the same but using the new explicit consumer option for sourcing/mirroring

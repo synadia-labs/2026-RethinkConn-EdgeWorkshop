@@ -1,0 +1,26 @@
+{
+  "name": "MERGETELEMETRY",
+  "retention": "limits",
+  "max_consumers": -1,
+  "max_msgs_per_subject": 0,
+  "max_msgs": -1,
+  "max_bytes": -1,
+  "max_age": 0,
+  "max_msg_size": -1,
+  "storage": "file",
+  "discard": "old",
+  "num_replicas": 1,
+  "duplicate_window": 120000000000,
+  "sources": [
+    { "name": "TELEMETRY", "external": { "api": "$JS.L1.API" }, "consumer": { "name": "l1-hub-src0", "deliver_subject": "$JS.S.TELEMETRY.l1-hub-src0" } },
+    { "name": "TELEMETRY", "external": { "api": "$JS.L2.API" }, "consumer": { "name": "l2-hub-src0", "deliver_subject": "$JS.S.TELEMETRY.l2-hub-src0" } },
+    { "name": "TELEMETRY", "external": { "api": "$JS.L3.API" }, "consumer": { "name": "l3-hub-src0", "deliver_subject": "$JS.S.TELEMETRY.l3-hub-src0" } }
+  ],
+  "sealed": false,
+  "deny_delete": false,
+  "deny_purge": false,
+  "allow_rollup_hdrs": false,
+  "allow_direct": true,
+  "mirror_direct": false,
+  "consumer_limits": {}
+}
