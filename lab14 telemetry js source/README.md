@@ -37,4 +37,5 @@ nats --context hub stream report
 
 ---
 
-Next lab does the same but using the new explicit consumer option for sourcing/mirroring
+Next lab does the same but using the new explicit consumer option for sourcing/mirroring.
+Compare the hub config files, the difference in required permissions in both directions for the sourcing to work correctly.

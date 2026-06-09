@@ -53,3 +53,5 @@ nats --context hub stream report
 ```
 
 ---
+
+Compare the hub config files with the previous lab, the difference in required permissions in both directions for the sourcing to work correctly.
