@@ -25,6 +25,9 @@ nats --context l3 pub --jetstream telemetry.device3.temp "3"
 nats --context l1 pub --jetstream telemetry.device4.temp "4"
 nats --context l2 pub --jetstream telemetry.device5.temp "5"
 nats --context l3 pub --jetstream telemetry.device6.temp "6"
+nats --context l1 pub --jetstream telemetry.device1.temp "7"
+nats --context l2 pub --jetstream telemetry.device2.temp "8"
+nats --context l3 pub --jetstream telemetry.device3.temp "9"
 ```
 
 Merged stream in hub:
@@ -39,3 +42,14 @@ nats --context hub stream report
 
 Next lab does the same but using the new explicit consumer option for sourcing/mirroring.
 Compare the hub config files, the difference in required permissions in both directions for the sourcing to work correctly.
+
+---
+
+## Merging limits
+
+How many sources can be merged?
+
+- Destination stream I/O bandwidth limits will normally determine this. Network could also saturate. Use case specific: a few bulky sourced streams vs a lot of low traffic ones.
+- Assuming I/O bandwidth not a bottleneck, a few thousands are possible, but...
+- ...on server restart the destination stream leader performs a linear backward scan to find out last message per source, while locking other stream operations (!)
+- Optimization to avoid this coming soon!
