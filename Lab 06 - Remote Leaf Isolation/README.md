@@ -1,4 +1,4 @@
-# Lab #6 - Remote leaf isolation
+# Lab #6 - Remote leaf isolation (Reverse hub)
 
 This lab uses the reverse connection form for leafnodes: the hub connects out to
 the leaf servers, and each leaf listens for incoming leafnode connections.
@@ -6,7 +6,7 @@ the leaf servers, and each leaf listens for incoming leafnode connections.
 The key option in this setup is `isolate` on a hub remote:
 
 ```hcl
-{ urls: ["nats-leaf://l:x@localhost:7442"], account: APP, hub: true, isolate: true }
+{ urls: ["nats-leaf://l:x@localhost:7452"], account: APP, hub: true, isolate: true }
 ```
 
 That isolates the selected remote from east-west interest originating locally at

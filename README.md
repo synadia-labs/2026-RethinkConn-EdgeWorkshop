@@ -40,15 +40,15 @@ See [Lab 00 - Setup](Lab%2000%20-%20Setup/README.md) for the original setup note
 | [Lab 03 - Interest Propagation](Lab%2003%20-%20Interest%20Propagation/README.md) | Subject interest propagation side lab |
 | [Lab 04 - Isolate](Lab%2004%20-%20Isolate/README.md) | Isolate east-west traffic |
 | [Lab 05 - Isolate and Request Isolation](Lab%2005%20-%20Isolate%20and%20Request%20Isolation/README.md) | More on `isolate` and `request_isolation` |
-| [Lab 06 - Remote Leaf Isolation](Lab%2006%20-%20Remote%20Leaf%20Isolation/README.md) | Reverse leaf connections with remote isolation |
+| [Lab 06 - Remote Leaf Isolation (Reverse Hub)](Lab%2006%20-%20Remote%20Leaf%20Isolation/README.md) | Reverse leaf connections with remote isolation |
 | [Lab 07 - Block Subjects](Lab%2007%20-%20Block%20Subjects/README.md) | Block subjects north-south |
 | [Lab 08 - SYS Account](Lab%2008%20-%20SYS%20Account/README.md) | SYS account leaf connection |
 | [Lab 09 - SYS Account Limits](Lab%2009%20-%20SYS%20Account%20Limits/README.md) | SYS account leaf connection with restrictions |
 | [Lab 10 - JetStream Subject Leak](Lab%2010%20-%20JetStream%20Subject%20Leak/README.md) | JetStream captured-subject leak |
 | [Lab 11 - JetStream Domain Lottery](Lab%2011%20-%20JetStream%20Domain%20Lottery/README.md) | JetStream domain lottery |
 | [Lab 12 - Locked Down Leafs](Lab%2012%20-%20Locked%20Down%20Leafs/README.md) | Locked down leafs |
-| [Lab 13 - Remote Leaf Streams](Lab%2013%20-%20Remote%20Leaf%20Streams/README.md) | Hub remote access to leaf streams |
-| [Lab 14 - Reserved](Lab%2014%20-%20Reserved/README.md) | Reserved |
+| [Lab 13 - Reserved](Lab%2013%20-%20Reserved/README.md) | Reserved |
+| [Lab 14 - Remote Leaf Streams](Lab%2014%20-%20Remote%20Leaf%20Streams/README.md) | Hub remote access to leaf streams |
 | [Lab 15 - Stream Sources](Lab%2015%20-%20Stream%20Sources/README.md) | Hub sources and merges leaf streams |
 | [Lab 16 - Explicit Consumers](Lab%2016%20-%20Explicit%20Consumers/README.md) | Hub sources and merges leaf streams with explicit consumers |
 | [Lab 17 - Device Republish](Lab%2017%20-%20Device%20Republish/README.md) | Target devices individually with stream republish |
