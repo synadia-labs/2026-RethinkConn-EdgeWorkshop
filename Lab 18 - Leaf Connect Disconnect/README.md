@@ -1,4 +1,4 @@
-# Lab #17 Leaf connect/disconnect
+# Lab #18 - Leaf connect/disconnect
 
 Previous to NATS 2.14, leaf configuration updates required restarting the updated server(s).
 
@@ -13,11 +13,20 @@ Also included in this Lab: a pattern to link/unlink a leaf externaly (works with
 Start the hub and 3 leafs as usual
 
 ```sh
-killall nats-server
-nats-server -c hub.conf &
-nats-server -c l1.conf &
-nats-server -c l2.conf &
-nats-server -c l3.conf &
+../workshop.sh start "Lab 18 - Leaf Connect Disconnect"
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
 ```
 
 Check the topology, from the hub:

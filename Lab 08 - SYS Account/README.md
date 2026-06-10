@@ -1,10 +1,31 @@
-# Lab #7 SYS account leaf connection
+# Lab #8 SYS account leaf connection
 
 - Leaf connect the system account in addition to the application account
 - Opens the door to monitor from the hub all kind of system events in the leafs, as well as invoking system services
 - Details on events and services: [https://docs.nats.io/running-a-nats-service/configuration/sys_accounts]
 - Without system account, observability would need Prometheus Exporter / NATS Surveyor as a side-car of each NATS server
 - With system account connected, observability can leverage a single NATS Surveyor to monitor the full topology
+
+---
+
+## Setup
+
+```sh
+../workshop.sh start 8
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
 
 ---
 
@@ -98,6 +119,6 @@ nats --context sysl1 server ls --trace
 
 All we need to do is limit permissions for the leaf user in the system account to restrict events and service calls as needed.
 
-Next Lab (#8) shows an example with SYS sharing restriction.
+Next Lab (#9) shows an example with SYS sharing restriction.
 
 ---

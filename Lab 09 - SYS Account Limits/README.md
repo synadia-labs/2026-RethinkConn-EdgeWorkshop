@@ -1,11 +1,32 @@
-# Lab #8 SYS account leaf connection with restrictions
+# Lab #9 SYS account leaf connection with restrictions
 
-- Similar to Lab #7, but limiting leaf<-->hub accesible services
+- Similar to Lab #8, but limiting leaf<-->hub accesible services
 
 Using permissions we can fine tune what should be shared and in what direction, both for security reasons *and/or* data volume concerns.
 
 Check available events at the docs [https://docs.nats.io/running-a-nats-service/configuration/sys_accounts]
 or just discover with `nats --context sysl1 sub '>'` and find out what to share or block.
+
+---
+
+## Setup
+
+```sh
+../workshop.sh start 9
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
 
 ---
 

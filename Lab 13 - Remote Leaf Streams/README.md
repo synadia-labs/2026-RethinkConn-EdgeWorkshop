@@ -1,4 +1,4 @@
-# Lab #12 - Hub remote accesing a stream in leaf
+# Lab #13 - Hub remote accesing a stream in leaf
 
 - Hub with restricted access to streams in leafs
 - leaf 1 - hub can access the full JetStream API in the leaf (incl. push consumer subjects)
@@ -7,6 +7,27 @@
 
 Important: $JS.ACK.> (consumer acks) and $JS.FC.> (consumer flow control) are not JS Domain aware. Make sure STREAMNAME+CONSUMERNAME are unique from the hub perspective.
 Placing the leaf JS Domain name as part of the consumer names will meet that requirement.  Mirror/Sourcing will create random consumer names and meet the requirement too.
+
+---
+
+## Setup
+
+```sh
+../workshop.sh start 13
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
 
 ---
 

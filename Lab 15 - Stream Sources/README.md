@@ -1,10 +1,31 @@
-# Lab #14 - Hub sources & merges streams from leafs
+# Lab #15 - Hub sources & merges streams from leafs
 
 - Telemetry Store & Forward & Merge in hub stream
 - Minimum set of $JS API subjects to support the sourcing
 - Uses the default sourcing ephemeral consumers and default delivery subjects (`$JS.S.>`)
 - These consumers are special, defined internally and not visible
 - They are not good when sourcing interest/workqueue streams (check next lab for that)
+
+---
+
+## Setup
+
+```sh
+../workshop.sh start 15
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
 
 ---
 

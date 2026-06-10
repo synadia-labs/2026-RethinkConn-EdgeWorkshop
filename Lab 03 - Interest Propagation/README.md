@@ -12,27 +12,28 @@ Similar setup to previous labs, but we'll start the servers with tracing on, in 
 Make sure no clients are dangling around from previous tests, they may reconnect (be safe with `killall nats`)
 
 ```sh
-$ ../workshop.sh start 1 --trace
-$ ../workshop.sh logs
+../workshop.sh start 1 --trace
+../workshop.sh logs
 ```
 
 Or
 
 ```sh
-$ ../workshop.sh start 2 --trace
-$ ../workshop.sh logs
+../workshop.sh start 2 --trace
+../workshop.sh logs
 ```
 
-Or manually:
+Direct equivalent, from either Lab 01 or Lab 02's directory:
 
+```sh
 # terminal 1
-nats-server -c hub.conf --trace   # blocks!
+nats-server -c hub.conf --trace
 # terminal 2
-nats-server -c l1.conf --trace   # blocks!
+nats-server -c l1.conf --trace
 # terminal 3
-nats-server -c l2.conf --trace   # blocks!
+nats-server -c l2.conf --trace
 # terminal 4
-nats-server -c l3.conf --trace   # blocks!
+nats-server -c l3.conf --trace
 ```
 
 ---

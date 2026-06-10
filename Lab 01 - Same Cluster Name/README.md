@@ -6,12 +6,25 @@
 
 ---
 
-## Setup notes
+## Setup
 
 Start the hub and 3 leaf nodes
 
 ```sh
-$ ../workshop.sh start 1
+../workshop.sh start 1
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
 ```
 
 ---

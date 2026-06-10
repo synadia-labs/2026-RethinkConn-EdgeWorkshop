@@ -1,9 +1,30 @@
-# Lab #10 - Another little mess with JetStreams (Domain lottery)
+# Lab #11 - Another little mess with JetStreams (Domain lottery)
 
 - Hub + leafs, East-West blocked (isolate:true and also explicit block for `telemtry.>` subject)
 - Each leaf has its own TELEMETRY stream (same name, same capture pattern)
 - Same JS Domain name (L) in all leafs
 - No JS Domain name in hub
+
+---
+
+## Setup
+
+```sh
+../workshop.sh start 11
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
 
 ---
 

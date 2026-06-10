@@ -14,7 +14,21 @@ leafnodes {
 ```
 
 ```sh
-$ ../workshop.sh start 4 --trace
+../workshop.sh start 4 --trace
+../workshop.sh logs
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf --trace
+# terminal 2
+nats-server -c l1.conf --trace
+# terminal 3
+nats-server -c l2.conf --trace
+# terminal 4
+nats-server -c l3.conf --trace
 ```
 
 Note the lack of subject interest propagation between the leafs despite different cluster names.

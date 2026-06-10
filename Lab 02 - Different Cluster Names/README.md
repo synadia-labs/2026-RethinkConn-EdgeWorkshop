@@ -8,6 +8,27 @@ Updated configs but same setup and test commands as Lab #1.
 
 ---
 
+## Setup
+
+```sh
+../workshop.sh start 2
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
+
+---
+
 ## Subscription test
 
 Outcomes:
@@ -21,7 +42,7 @@ Outcomes:
 Create a subscription from the hub and each leaf:
 
 ```sh
-$ ./demo.sh
+./demo.sh
 ```
 
 Or

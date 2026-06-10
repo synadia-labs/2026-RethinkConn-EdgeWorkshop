@@ -286,28 +286,45 @@ setup_tools() {
   return "$status"
 }
 
-lab_title() {
-  case "$1" in
-    lab0) printf 'Lab 00 - Setup\n' ;;
-    lab1) printf 'Lab 01 - Same Cluster Name\n' ;;
-    lab2) printf 'Lab 02 - Different Cluster Names\n' ;;
-    lab3) printf 'Lab 03 - Interest Propagation\n' ;;
-    lab4) printf 'Lab 04 - Isolate\n' ;;
-    lab5) printf 'Lab 05 - Isolate and Request Isolation\n' ;;
-    lab6) printf 'Lab 06 - Block Subjects\n' ;;
-    lab7) printf 'Lab 07 - SYS Account\n' ;;
-    lab8) printf 'Lab 08 - SYS Account Limits\n' ;;
-    lab9) printf 'Lab 09 - JetStream Subject Leak\n' ;;
-    lab10) printf 'Lab 10 - JetStream Domain Lottery\n' ;;
-    lab11) printf 'Lab 11 - Locked Down Leafs\n' ;;
-    lab12) printf 'Lab 12 - Remote Leaf Streams\n' ;;
-    lab13) printf 'Lab 13 - Reserved\n' ;;
-    lab14) printf 'Lab 14 - Stream Sources\n' ;;
-    lab15) printf 'Lab 15 - Explicit Consumers\n' ;;
-    lab16) printf 'Lab 16 - Device Republish\n' ;;
-    lab17) printf 'Lab 17 - Leaf Connect Disconnect\n' ;;
-    lab18) printf 'Lab 18 - JWT Default User\n' ;;
-    *) printf '%s\n' "$1" ;;
+lab_number_from_name() {
+  local base="${1##*/}"
+
+  if [[ "$base" =~ ^[Ll][Aa][Bb][[:space:]]+0*([0-9]+)[[:space:]]+- ]]; then
+    printf '%s\n' "$((10#${BASH_REMATCH[1]}))"
+    return
+  fi
+
+  return 1
+}
+
+find_lab_by_number() {
+  local number="$1"
+  local dir base dir_number
+  local matches=()
+
+  shopt -s nullglob
+  for dir in "$ROOT"/Lab\ *; do
+    [[ -d "$dir" ]] || continue
+    base="${dir##*/}"
+    if dir_number="$(lab_number_from_name "$base")" && [[ "$dir_number" -eq "$number" ]]; then
+      matches+=("$base")
+    fi
+  done
+  shopt -u nullglob
+
+  case "${#matches[@]}" in
+    0)
+      printf 'lab directory not found for lab %02d\n' "$number" >&2
+      return 1
+      ;;
+    1)
+      printf '%s\n' "${matches[0]}"
+      ;;
+    *)
+      printf 'lab number %02d is ambiguous; use the full directory name:\n' "$number" >&2
+      printf '  %s\n' "${matches[@]}" >&2
+      return 1
+      ;;
   esac
 }
 
@@ -315,57 +332,80 @@ normalize_lab() {
   local input="$1"
   local base number
 
+  input="${input%/}"
   base="${input##*/}"
+
+  if [[ -d "$ROOT/$base" ]] && lab_number_from_name "$base" >/dev/null; then
+    printf '%s\n' "$base"
+    return
+  fi
 
   if [[ "$base" =~ ^[0-9]+$ ]]; then
     number="$((10#$base))"
-    printf 'lab%s\n' "$number"
+    find_lab_by_number "$number"
     return
   fi
 
   if [[ "$base" =~ ^[Ll][Aa][Bb]([0-9]+)$ ]]; then
     number="$((10#${BASH_REMATCH[1]}))"
-    printf 'lab%s\n' "$number"
+    find_lab_by_number "$number"
     return
   fi
 
   if [[ "$base" =~ ^[Ll][Aa][Bb][[:space:]]+0*([0-9]+)[[:space:]]+- ]]; then
-    number="$((10#${BASH_REMATCH[1]}))"
-    printf 'lab%s\n' "$number"
-    return
+    printf 'lab directory not found: %s\n' "$base" >&2
+    return 1
   fi
 
   printf 'unknown lab input: %s\n' "$input" >&2
   return 1
 }
 
+lab_title() {
+  local title
+
+  if title="$(normalize_lab "$1" 2>/dev/null)"; then
+    printf '%s\n' "$title"
+    return
+  fi
+
+  printf '%s\n' "$1"
+}
+
 lab_dir() {
   local lab="$1"
-  printf '%s/%s\n' "$ROOT" "$(lab_title "$lab")"
+  local title
+
+  title="$(normalize_lab "$lab")" || return 1
+  printf '%s/%s\n' "$ROOT" "$title"
 }
 
 known_labs() {
-  local i lab title
-  for i in {0..99}; do
-    lab="lab$i"
-    title="$(lab_title "$lab")"
-    if [[ -d "$ROOT/$title" ]]; then
-      printf '%s\n' "$lab"
-    fi
+  local dir base
+
+  shopt -s nullglob
+  for dir in "$ROOT"/Lab\ *; do
+    [[ -d "$dir" ]] || continue
+    base="${dir##*/}"
+    lab_number_from_name "$base" >/dev/null || continue
+    printf '%s\n' "$base"
   done
+  shopt -u nullglob
 }
 
 list_labs() {
-  local lab
+  local lab number
   while IFS= read -r lab; do
-    printf '%02d  %s\n' "${lab#lab}" "$(lab_title "$lab")"
+    number="$(lab_number_from_name "$lab")"
+    printf '%02d  %s\n' "$number" "$lab"
   done < <(known_labs)
 }
 
 validate_lab() {
   local lab="$1"
   local dir
-  dir="$(lab_dir "$lab")"
+
+  dir="$(lab_dir "$lab")" || return 1
 
   [[ -d "$dir" ]] || {
     printf 'lab directory not found: %s\n' "$dir" >&2
@@ -529,19 +569,42 @@ remove_contexts_if_possible() {
   remove_all_contexts "$nats_cli" "$jq_bin"
 }
 
+lab_run_key() {
+  local lab="$1"
+  local number
+
+  if number="$(lab_number_from_name "$lab" 2>/dev/null)"; then
+    printf 'lab%s\n' "$number"
+    return
+  fi
+
+  if [[ "$lab" =~ ^[Ll][Aa][Bb]([0-9]+)$ ]]; then
+    printf 'lab%s\n' "$((10#${BASH_REMATCH[1]}))"
+    return
+  fi
+
+  printf '%s\n' "$lab"
+}
+
 run_dir() {
   local lab="$1"
-  printf '%s/%s\n' "$RUNS_DIR" "$lab"
+  printf '%s/%s\n' "$RUNS_DIR" "$(lab_run_key "$lab")"
 }
 
 read_current() {
   local first second third
+  local canonical
 
   [[ -f "$CURRENT_FILE" ]] || return 1
   IFS=$'\t' read -r first second third < "$CURRENT_FILE"
   [[ -n "${first:-}" ]] || return 1
 
-  CURRENT_LAB="$first"
+  if canonical="$(normalize_lab "$first" 2>/dev/null)"; then
+    CURRENT_LAB="$canonical"
+  else
+    CURRENT_LAB="$first"
+  fi
+
   if [[ -n "${third:-}" ]]; then
     CURRENT_RUN_DIR="$third"
   else
@@ -610,7 +673,7 @@ target_from_logs_args() {
     return
   fi
 
-  if [[ "$first" =~ ^(hub|l1|l2|l3|l3gate|rhub|rl1|rl2|rl3|nats)$ ]] && read_current; then
+  if [[ "$first" =~ ^(hub|l1|l2|l3|l3gate|nats)$ ]] && read_current; then
     TARGET_LAB="$CURRENT_LAB"
     LOG_SERVER="$first"
     return

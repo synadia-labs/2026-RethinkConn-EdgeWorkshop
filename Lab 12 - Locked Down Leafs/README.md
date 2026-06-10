@@ -1,4 +1,4 @@
-# Lab #11 - Locked down leafs
+# Lab #12 - Locked down leafs
 
 - Not really a lab, but a starting point to unlock subjects as needed in the next few labs
 - Hub + leafs, different cluster names, East-West disabled
@@ -21,6 +21,27 @@ All this is core nats. JetStreams will open another world of possibilities.
 
 ---
 
+## Setup
+
+```sh
+../workshop.sh start 12
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
+
+---
+
 ## JetStreams - what to unlock?
 
 Cross-domain JetStream access will need some subjects open leaf->hub and hub->leaf.
@@ -28,6 +49,12 @@ Cross-domain JetStream access will need some subjects open leaf->hub and hub->le
 JetStream API is documented (mostly...): [https://docs.nats.io/reference/reference-protocols/nats_api_reference]
 
 Something that will help _a lot_ with any loose ends --> Keep these running while testing/debugging issues:
+
+```sh
+./demo.sh
+```
+
+Or manually:
 
 ```sh
 # in different terminals:

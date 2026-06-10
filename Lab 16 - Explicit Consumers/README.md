@@ -1,4 +1,4 @@
-# Lab #15 - Hub sources & merges streams from leafs
+# Lab #16 - Hub sources & merges streams from leafs
 
 - Telemetry Store & Forward & Merge in hub stream
 - Minimum set of $JS API subjects to support the sourcing
@@ -13,6 +13,27 @@ The manually created consumers must meet some requirements
 - `max_ack_pending` is respected.
 - Both Flow control and ACK subjects are needed.
 - Both stream+consumer names and delivery subjects should be unique (we use leaf # to add uniqueness)
+
+---
+
+## Setup
+
+```sh
+../workshop.sh start 16
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
 
 ---
 

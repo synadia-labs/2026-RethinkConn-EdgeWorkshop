@@ -1,4 +1,4 @@
-# Decentralized authentication - `default_sentinel` to get `no_auth_user` behaviour
+# Lab #19 - Decentralized authentication - `default_sentinel` to get `no_auth_user` behaviour
 
 - NATS v2.11 added a `default_sentinel` configuration option, mostly to handle auth callout scenarios where a single auth account is enough (as a way to avoid having to distribute the sentinel bearer token to all clients)
 - The feature can actually be used independently of auth callout, as a way to replicate in decent auth the `no_auth_user` feature existing in static authentication

@@ -1,11 +1,11 @@
-# Lab #6 - Block subjects (North-South)
+# Lab #7 - Block subjects (North-South)
 
 There are two ways to block subjects for North-South traffic:
 
 1. On the hub side ---> permissions for the leaf user (pub/sub allow/deny `permissions`)
 2. On the leaf side ---> deny lists in the remote (`remotes[].deny_imports/deny_exports`
 
-They can be combined.
+These can be combined.
 This way both sides have some control, though hub-side permissions are a bit more flexible.
 Additionally both hub and leafs will do a best effort to avoid interest propagation message exchanges based on these.
 
@@ -21,9 +21,36 @@ Review the server config files:
 
 ---
 
+## Setup
+
+```sh
+../workshop.sh start 7
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
+
+---
+
 ## Testing north-south traffic block
 
 Test publishing (messages leaf --> hub)
+
+```sh
+./demo.sh nopub.foo
+```
+
+Or manually:
 
 ```sh
 # Create subscribers in multiple terminals
@@ -40,6 +67,12 @@ nats --context l3  pub nopub.foo  "l3: nopub"
 ```
 
 Test subscription (messages leaf <-- hub)
+
+```sh
+./demo.sh nosub.foo
+```
+
+Or manually:
 
 ```sh
 # Create subscribers in multiple terminals
@@ -72,15 +105,21 @@ The only exception is `deny_exports` (as of NATS 2.14.2.  This could be optimize
 We can explore the details starting the servers in trace mode:
 
 ```sh
-# run servers with tracing
+../workshop.sh restart 7 --trace
+../workshop.sh logs
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
 # terminal 1
-nats-server -c hub.conf --trace  # blocks!
+nats-server -c hub.conf --trace
 # terminal 2
-nats-server -c l1.conf --trace  # blocks!
+nats-server -c l1.conf --trace
 # terminal 3
-nats-server -c l2.conf --trace  # blocks!
+nats-server -c l2.conf --trace
 # terminal 4
-nats-server -c l3.conf --trace  # blocks!
+nats-server -c l3.conf --trace
 ```
 
 ### Subscribing

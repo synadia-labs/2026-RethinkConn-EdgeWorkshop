@@ -19,7 +19,7 @@
 ## Setup
 
 ```sh
-$ ../workshop.sh setup
+../workshop.sh setup
 ```
 
 ### Manual Setup
@@ -54,26 +54,51 @@ nats context rm -f sysl3
 
 ## NATS servers
 
-To run the nats servers:
+To run the NATS servers for a lab, use the workshop helper from that lab
+directory:
 
 ```sh
-nats-server -c hub.conf &
-nats-server -c l1.conf &
-nats-server -c l2.conf &
-nats-server -c l3.conf &
-
-# make sure they all 4 are running
-jobs
+../workshop.sh start <lab-number>
+../workshop.sh logs
 ```
 
-Make sure to start the servers in the right directory. Each lab will use its own config files (unless otherwise noted).
+Each lab uses its own config files. The helper starts `nats-server -c <config>`
+from the lab directory.
 
-In some labs we'll run these with tracing enabled using option `--trace` or adding `trace:true` to the .conf file.
-
-Stopping servers, this is the lazy but easy way:
+The direct equivalent is to run each server config from the lab directory, one
+per terminal:
 
 ```sh
-killall nats-server
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
+
+In some labs we'll run these with tracing enabled:
+
+```sh
+../workshop.sh restart <lab-number> --trace
+../workshop.sh logs
+```
+
+Or directly:
+
+```sh
+nats-server -c hub.conf --trace
+nats-server -c l1.conf --trace
+nats-server -c l2.conf --trace
+nats-server -c l3.conf --trace
+```
+
+Stopping servers:
+
+```sh
+../workshop.sh stop <lab-number>
 ```
 
 In some labs you may have left behind some nats-cli clients dangling around that interfere with subsequent labs.
@@ -86,7 +111,7 @@ killall nats
 For tests using JetStreams, a final cleanup of stores is needed:
 
 ```sh
-rm -Rf ./js
+../workshop.sh clean <lab-number>
 ```
 
 ---

@@ -1,10 +1,31 @@
-# Lab #9 - A little mess with JetStreams (captured subjects leak)
+# Lab #10 - A little mess with JetStreams (captured subjects leak)
 
 - Hub + leafs, different cluster names, East-West enabled
 - No restrictions on permission North-South
 - Each leaf has its own TELEMETRY stream (same name, same capture pattern)
 
 What will happen?
+
+---
+
+## Setup
+
+```sh
+../workshop.sh start 10
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
 
 ---
 

@@ -1,4 +1,4 @@
-# Lab #xx - Target devices individually with stream republish
+# Lab #17 - Target devices individually with stream republish
 
 Summary:
 
@@ -14,6 +14,25 @@ Limitations:
 ---
 
 ## Setup
+
+Start the lab:
+
+```sh
+../workshop.sh start "Lab 17 - Device Republish"
+```
+
+Direct equivalent, from this lab directory:
+
+```sh
+# terminal 1
+nats-server -c hub.conf
+# terminal 2
+nats-server -c l1.conf
+# terminal 3
+nats-server -c l2.conf
+# terminal 4
+nats-server -c l3.conf
+```
 
 Leafs lock `edge.>` locally (block interest leaving the edge or coming in): in this setup the hub is already locking down most subjects using permissions, but just in case the leaf also locks `edge.>` using `deny_exports/imports`
 
