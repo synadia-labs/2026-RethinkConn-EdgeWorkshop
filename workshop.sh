@@ -11,7 +11,7 @@ Usage:
   ./workshop.sh restart <lab>
   ./workshop.sh status [lab]
   ./workshop.sh logs [lab] [server]
-  ./workshop.sh clean [lab]
+  ./workshop.sh clean [lab|all]
 
 Examples:
   ./workshop.sh setup
@@ -242,7 +242,7 @@ setup_requirement() {
 }
 
 setup_tools() {
-  local status=0
+  local status=0 nats_cli jq_bin
 
   SETUP_INSTALLED=0
   download_platform
@@ -271,9 +271,15 @@ setup_tools() {
     "/jq-${DOWNLOAD_JQ_PLATFORM}-${DOWNLOAD_ARCH}$" || status=1
 
   if [[ "$status" -eq 0 ]]; then
+    nats_cli="$(resolve_tool nats)"
+    jq_bin="$(resolve_tool jq)"
+    create_all_contexts "$nats_cli" "$jq_bin" || status=1
+  fi
+
+  if [[ "$status" -eq 0 ]]; then
     printf 'setup complete\n'
   else
-    printf 'setup incomplete; install the missing tools or rerun setup\n' >&2
+    printf 'setup incomplete; resolve the errors above and rerun setup\n' >&2
   fi
 
   return "$status"
@@ -383,6 +389,143 @@ server_specs() {
     printf '%s|%s|%s\n' nats "$lab" server.conf
     return
   fi
+}
+
+context_specs() {
+  cat <<'EOF'
+hub|nats://localhost:4222|a|x|Workshop hub app user
+l1|nats://localhost:4232|e|x|Workshop leaf 1 app user
+l2|nats://localhost:4242|e|x|Workshop leaf 2 app user
+l3|nats://localhost:4252|e|x|Workshop leaf 3 app user
+syshub|nats://localhost:4222|s|x|Workshop hub SYS user
+sysl1|nats://localhost:4232|s|x|Workshop leaf 1 SYS user
+sysl2|nats://localhost:4242|s|x|Workshop leaf 2 SYS user
+sysl3|nats://localhost:4252|s|x|Workshop leaf 3 SYS user
+EOF
+}
+
+context_exists() {
+  local nats_cli="$1"
+  local jq_bin="$2"
+  local name="$3"
+
+  "$nats_cli" context ls -j 2>/dev/null |
+    "$jq_bin" -e --arg name "$name" '(. // [])[] | select(.name == $name)' >/dev/null 2>&1
+}
+
+context_matches_spec() {
+  local nats_cli="$1"
+  local jq_bin="$2"
+  local name="$3"
+  local url="$4"
+  local user="$5"
+  local password="$6"
+  local description="$7"
+
+  "$nats_cli" context ls -j 2>/dev/null |
+    "$jq_bin" -e \
+      --arg name "$name" \
+      --arg url "$url" \
+      --arg user "$user" \
+      --arg password "$password" \
+      --arg description "$description" \
+      '(. // [])[] | select(.name == $name and .url == $url and .user == $user and .password == $password and .description == $description)' \
+      >/dev/null 2>&1
+}
+
+context_summary() {
+  local nats_cli="$1"
+  local jq_bin="$2"
+  local name="$3"
+
+  "$nats_cli" context ls -j 2>/dev/null |
+    "$jq_bin" -r --arg name "$name" \
+      '(. // [])[] | select(.name == $name) | "\(.name) -> \(.url) user=\(.user // "") description=\(.description // "")"' \
+      2>/dev/null
+}
+
+confirm_context_overwrite() {
+  local nats_cli="$1"
+  local jq_bin="$2"
+  local conflicts=()
+  local name url user password description answer
+
+  while IFS='|' read -r name url user password description; do
+    if context_exists "$nats_cli" "$jq_bin" "$name" &&
+      ! context_matches_spec "$nats_cli" "$jq_bin" "$name" "$url" "$user" "$password" "$description"; then
+      conflicts+=("$(context_summary "$nats_cli" "$jq_bin" "$name")")
+    fi
+  done < <(context_specs)
+
+  if [[ ${#conflicts[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  printf 'NATS context name conflicts found:\n' >&2
+  printf '  %s\n' "${conflicts[@]}" >&2
+
+  if [[ ! -t 0 ]]; then
+    printf 'refusing to overwrite existing NATS contexts without interactive confirmation\n' >&2
+    return 1
+  fi
+
+  printf 'Overwrite these contexts with workshop local settings? [y/N] '
+  read -r answer
+  case "$answer" in
+    y|Y|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+create_all_contexts() {
+  local nats_cli="$1"
+  local jq_bin="$2"
+  local name url user password description status=0
+
+  confirm_context_overwrite "$nats_cli" "$jq_bin" || return 1
+
+  printf 'creating NATS contexts\n'
+  while IFS='|' read -r name url user password description; do
+    if "$nats_cli" --no-context --server "$url" --user "$user" --password "$password" \
+      context add "$name" --description "$description" >/dev/null; then
+      printf '%-8s %s\n' "$name" "$url"
+    else
+      status=1
+    fi
+  done < <(context_specs)
+
+  return "$status"
+}
+
+remove_all_contexts() {
+  local nats_cli="$1"
+  local jq_bin="$2"
+  local name url user password description
+
+  while IFS='|' read -r name url user password description; do
+    if context_matches_spec "$nats_cli" "$jq_bin" "$name" "$url" "$user" "$password" "$description" &&
+      "$nats_cli" context rm -f "$name" >/dev/null 2>&1; then
+      printf '%-8s removed\n' "$name"
+    elif context_exists "$nats_cli" "$jq_bin" "$name"; then
+      printf '%-8s skipped; context does not match workshop settings\n' "$name"
+    fi
+  done < <(context_specs)
+}
+
+remove_contexts_if_possible() {
+  local nats_cli jq_bin
+
+  if ! nats_cli="$(resolve_tool nats)"; then
+    printf 'nats CLI not found; skipping context cleanup\n' >&2
+    return 0
+  fi
+
+  if ! jq_bin="$(resolve_tool jq)"; then
+    printf 'jq not found; skipping context cleanup\n' >&2
+    return 0
+  fi
+
+  remove_all_contexts "$nats_cli" "$jq_bin"
 }
 
 run_dir() {
@@ -670,7 +813,7 @@ logs_lab() {
   tail -f "${logs[@]}"
 }
 
-clean_lab() {
+clean_lab_runtime() {
   local lab="$1"
   local dir
 
@@ -680,6 +823,23 @@ clean_lab() {
   rm -rf "$dir" "$(lab_dir "$lab")/js"
   clear_current_if "$lab"
   printf 'cleaned %s\n' "$(lab_title "$lab")"
+}
+
+clean_lab() {
+  local lab="$1"
+
+  clean_lab_runtime "$lab"
+  remove_contexts_if_possible
+}
+
+clean_all() {
+  local lab
+
+  while IFS= read -r lab; do
+    clean_lab_runtime "$lab"
+  done < <(known_labs)
+  remove_contexts_if_possible
+  rm -f "$CURRENT_FILE"
 }
 
 main() {
@@ -755,8 +915,12 @@ main() {
         usage
         exit 2
       }
-      target_from_args_or_current "${1:-}"
-      clean_lab "$TARGET_LAB"
+      if [[ "${1:-}" == "all" ]]; then
+        clean_all
+      else
+        target_from_args_or_current "${1:-}"
+        clean_lab "$TARGET_LAB"
+      fi
       ;;
     *)
       usage
