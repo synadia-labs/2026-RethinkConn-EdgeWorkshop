@@ -1,0 +1,768 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./workshop.sh setup
+  ./workshop.sh list
+  ./workshop.sh start <lab>
+  ./workshop.sh stop [lab]
+  ./workshop.sh restart <lab>
+  ./workshop.sh status [lab]
+  ./workshop.sh logs [lab] [server]
+  ./workshop.sh clean [lab]
+
+Examples:
+  ./workshop.sh setup
+  ./workshop.sh start 1
+  ./workshop.sh start lab1
+  ./workshop.sh logs
+  ./workshop.sh logs hub
+  ./workshop.sh stop
+
+Lab inputs may be a number, a labN id, or a formal directory name such as
+"Lab 01 - Same Cluster Name".
+
+Only one local lab runner is tracked as current. Starting a different lab while
+one is running prompts to stop the current lab first.
+EOF
+}
+
+root_dir() {
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  printf '%s\n' "$script_dir"
+}
+
+ROOT="$(root_dir)"
+STATE_DIR="$ROOT/.workshop"
+RUNS_DIR="$STATE_DIR/runs"
+BIN_DIR="$STATE_DIR/bin"
+CURRENT_FILE="$STATE_DIR/current-run"
+
+export PATH="$BIN_DIR:$PATH"
+
+is_running() {
+  local pid="${1:-}"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+resolve_tool() {
+  local name="$1"
+
+  if command -v "$name" >/dev/null 2>&1; then
+    command -v "$name"
+    return
+  fi
+
+  if [[ -x "$BIN_DIR/$name" ]]; then
+    printf '%s/%s\n' "$BIN_DIR" "$name"
+    return
+  fi
+
+  return 1
+}
+
+download_platform() {
+  local os arch platform jq_platform
+
+  case "$(uname -s)" in
+    Darwin)
+      platform="darwin"
+      jq_platform="macos"
+      ;;
+    Linux)
+      platform="linux"
+      jq_platform="linux"
+      ;;
+    *)
+      printf 'unsupported OS for automatic downloads: %s\n' "$(uname -s)" >&2
+      return 1
+      ;;
+  esac
+
+  case "$(uname -m)" in
+    x86_64|amd64)
+      arch="amd64"
+      ;;
+    arm64|aarch64)
+      arch="arm64"
+      ;;
+    *)
+      printf 'unsupported architecture for automatic downloads: %s\n' "$(uname -m)" >&2
+      return 1
+      ;;
+  esac
+
+  DOWNLOAD_PLATFORM="$platform"
+  DOWNLOAD_JQ_PLATFORM="$jq_platform"
+  DOWNLOAD_ARCH="$arch"
+}
+
+latest_asset_url() {
+  local repo="$1"
+  local pattern="$2"
+  local url
+
+  command -v curl >/dev/null 2>&1 || {
+    printf 'curl is required for automatic downloads\n' >&2
+    return 1
+  }
+
+  url="$(
+    {
+      curl -fsSL "https://api.github.com/repos/$repo/releases/latest" |
+        sed -n 's/.*"browser_download_url": "\(.*\)".*/\1/p' |
+        grep -E "$pattern" |
+        head -n 1
+    } || true
+  )"
+
+  [[ -n "$url" ]] || {
+    printf 'could not find a release asset for %s matching %s\n' "$repo" "$pattern" >&2
+    return 1
+  }
+
+  printf '%s\n' "$url"
+}
+
+install_archive_tool() {
+  local name="$1"
+  local repo="$2"
+  local pattern="$3"
+  local url tmp archive found target
+
+  mkdir -p "$BIN_DIR"
+  url="$(latest_asset_url "$repo" "$pattern")"
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/workshop-download.XXXXXX")"
+  archive="$tmp/asset"
+  target="$BIN_DIR/$name"
+
+  printf 'downloading %s\n' "$url"
+  curl -fsSL -o "$archive" "$url"
+
+  case "$url" in
+    *.zip)
+      command -v unzip >/dev/null 2>&1 || {
+        printf 'unzip is required to extract %s\n' "$url" >&2
+        rm -rf "$tmp"
+        return 1
+      }
+      unzip -q "$archive" -d "$tmp"
+      ;;
+    *.tar.gz|*.tgz)
+      tar -xzf "$archive" -C "$tmp"
+      ;;
+    *)
+      printf 'unsupported archive type: %s\n' "$url" >&2
+      rm -rf "$tmp"
+      return 1
+      ;;
+  esac
+
+  found="$(find "$tmp" -type f -name "$name" -perm -111 | head -n 1)"
+  if [[ -z "$found" ]]; then
+    found="$(find "$tmp" -type f -name "$name" | head -n 1)"
+  fi
+
+  [[ -n "$found" ]] || {
+    printf 'could not find %s in downloaded archive\n' "$name" >&2
+    rm -rf "$tmp"
+    return 1
+  }
+
+  cp "$found" "$target"
+  chmod 0755 "$target"
+  rm -rf "$tmp"
+  SETUP_INSTALLED=1
+  printf 'installed %s\n' "$target"
+}
+
+install_direct_tool() {
+  local name="$1"
+  local repo="$2"
+  local pattern="$3"
+  local url target
+
+  mkdir -p "$BIN_DIR"
+  url="$(latest_asset_url "$repo" "$pattern")"
+  target="$BIN_DIR/$name"
+
+  printf 'downloading %s\n' "$url"
+  curl -fsSL -o "$target" "$url"
+  chmod 0755 "$target"
+  SETUP_INSTALLED=1
+  printf 'installed %s\n' "$target"
+}
+
+prompt_install() {
+  local label="$1"
+  local answer
+
+  if [[ ! -t 0 ]]; then
+    printf '%s is missing; rerun setup interactively to download it\n' "$label" >&2
+    return 1
+  fi
+
+  printf '%s is missing. Download it to %s? [y/N] ' "$label" "$BIN_DIR"
+  read -r answer
+  case "$answer" in
+    y|Y|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+setup_requirement() {
+  local command_name="$1"
+  local label="$2"
+  local installer="$3"
+  local repo="$4"
+  local pattern="$5"
+  local path
+
+  if path="$(resolve_tool "$command_name")"; then
+    printf '%-12s found: %s\n' "$label" "$path"
+    return 0
+  fi
+
+  if ! prompt_install "$label"; then
+    printf '%-12s missing\n' "$label"
+    return 1
+  fi
+
+  case "$installer" in
+    archive) install_archive_tool "$command_name" "$repo" "$pattern" ;;
+    direct) install_direct_tool "$command_name" "$repo" "$pattern" ;;
+    *)
+      printf 'unknown installer type: %s\n' "$installer" >&2
+      return 1
+      ;;
+  esac
+}
+
+setup_tools() {
+  local status=0
+
+  SETUP_INSTALLED=0
+  download_platform
+  mkdir -p "$BIN_DIR"
+  printf 'local bin: %s\n' "$BIN_DIR"
+
+  setup_requirement \
+    nats-server \
+    nats-server \
+    archive \
+    nats-io/nats-server \
+    "/nats-server-v[^/]*-${DOWNLOAD_PLATFORM}-${DOWNLOAD_ARCH}\\.(zip|tar\\.gz)$" || status=1
+
+  setup_requirement \
+    nats \
+    nats-cli \
+    archive \
+    nats-io/natscli \
+    "/nats-[0-9][^/]*-${DOWNLOAD_PLATFORM}-${DOWNLOAD_ARCH}\\.(zip|tar\\.gz)$" || status=1
+
+  setup_requirement \
+    jq \
+    jq \
+    direct \
+    jqlang/jq \
+    "/jq-${DOWNLOAD_JQ_PLATFORM}-${DOWNLOAD_ARCH}$" || status=1
+
+  if [[ "$status" -eq 0 ]]; then
+    printf 'setup complete\n'
+  else
+    printf 'setup incomplete; install the missing tools or rerun setup\n' >&2
+  fi
+
+  return "$status"
+}
+
+lab_title() {
+  case "$1" in
+    lab0) printf 'Lab 00 - Setup\n' ;;
+    lab1) printf 'Lab 01 - Same Cluster Name\n' ;;
+    lab2) printf 'Lab 02 - Different Cluster Names\n' ;;
+    lab3) printf 'Lab 03 - Interest Propagation\n' ;;
+    lab4) printf 'Lab 04 - Isolate\n' ;;
+    lab5) printf 'Lab 05 - Isolate and Request Isolation\n' ;;
+    lab6) printf 'Lab 06 - Block Subjects\n' ;;
+    lab7) printf 'Lab 07 - SYS Account\n' ;;
+    lab8) printf 'Lab 08 - SYS Account Limits\n' ;;
+    lab9) printf 'Lab 09 - JetStream Subject Leak\n' ;;
+    lab10) printf 'Lab 10 - JetStream Domain Lottery\n' ;;
+    lab11) printf 'Lab 11 - Locked Down Leafs\n' ;;
+    lab12) printf 'Lab 12 - Remote Leaf Streams\n' ;;
+    lab13) printf 'Lab 13 - Reserved\n' ;;
+    lab14) printf 'Lab 14 - Stream Sources\n' ;;
+    lab15) printf 'Lab 15 - Explicit Consumers\n' ;;
+    lab16) printf 'Lab 16 - Device Republish\n' ;;
+    lab17) printf 'Lab 17 - Leaf Connect Disconnect\n' ;;
+    lab18) printf 'Lab 18 - JWT Default User\n' ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+normalize_lab() {
+  local input="$1"
+  local base number
+
+  base="${input##*/}"
+
+  if [[ "$base" =~ ^[0-9]+$ ]]; then
+    number="$((10#$base))"
+    printf 'lab%s\n' "$number"
+    return
+  fi
+
+  if [[ "$base" =~ ^[Ll][Aa][Bb]([0-9]+)$ ]]; then
+    number="$((10#${BASH_REMATCH[1]}))"
+    printf 'lab%s\n' "$number"
+    return
+  fi
+
+  if [[ "$base" =~ ^[Ll][Aa][Bb][[:space:]]+0*([0-9]+)[[:space:]]+- ]]; then
+    number="$((10#${BASH_REMATCH[1]}))"
+    printf 'lab%s\n' "$number"
+    return
+  fi
+
+  printf 'unknown lab input: %s\n' "$input" >&2
+  return 1
+}
+
+lab_dir() {
+  local lab="$1"
+  printf '%s/%s\n' "$ROOT" "$(lab_title "$lab")"
+}
+
+known_labs() {
+  local i lab title
+  for i in {0..99}; do
+    lab="lab$i"
+    title="$(lab_title "$lab")"
+    if [[ -d "$ROOT/$title" ]]; then
+      printf '%s\n' "$lab"
+    fi
+  done
+}
+
+list_labs() {
+  local lab
+  while IFS= read -r lab; do
+    printf '%02d  %s\n' "${lab#lab}" "$(lab_title "$lab")"
+  done < <(known_labs)
+}
+
+validate_lab() {
+  local lab="$1"
+  local dir
+  dir="$(lab_dir "$lab")"
+
+  [[ -d "$dir" ]] || {
+    printf 'lab directory not found: %s\n' "$dir" >&2
+    return 1
+  }
+}
+
+server_specs() {
+  local lab="$1"
+  local dir
+  dir="$(lab_dir "$lab")"
+
+  if [[ -f "$dir/hub.conf" ]]; then
+    [[ -f "$dir/hub.conf" ]] && printf '%s|%s|%s\n' hub "$lab" hub.conf
+    [[ -f "$dir/l1.conf" ]] && printf '%s|%s|%s\n' l1 "$lab" l1.conf
+    [[ -f "$dir/l2.conf" ]] && printf '%s|%s|%s\n' l2 "$lab" l2.conf
+    [[ -f "$dir/l3.conf" ]] && printf '%s|%s|%s\n' l3 "$lab" l3.conf
+    return
+  fi
+
+  if [[ -f "$dir/server.conf" ]]; then
+    printf '%s|%s|%s\n' nats "$lab" server.conf
+    return
+  fi
+}
+
+run_dir() {
+  local lab="$1"
+  printf '%s/%s\n' "$RUNS_DIR" "$lab"
+}
+
+read_current() {
+  local first second third
+
+  [[ -f "$CURRENT_FILE" ]] || return 1
+  IFS=$'\t' read -r first second third < "$CURRENT_FILE"
+  [[ -n "${first:-}" ]] || return 1
+
+  CURRENT_LAB="$first"
+  if [[ -n "${third:-}" ]]; then
+    CURRENT_RUN_DIR="$third"
+  else
+    CURRENT_RUN_DIR="$second"
+  fi
+
+  [[ -n "${CURRENT_RUN_DIR:-}" ]]
+}
+
+write_current() {
+  local lab="$1"
+  local dir="$2"
+  mkdir -p "$STATE_DIR"
+  printf '%s\t%s\n' "$lab" "$dir" > "$CURRENT_FILE"
+}
+
+clear_current_if() {
+  local lab="$1"
+  if read_current && [[ "$CURRENT_LAB" == "$lab" ]]; then
+    rm -f "$CURRENT_FILE"
+  fi
+}
+
+run_dir_has_processes() {
+  local dir="$1"
+  local pid_file pid
+  shopt -s nullglob
+  for pid_file in "$dir"/*.pid; do
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+    if is_running "$pid"; then
+      shopt -u nullglob
+      return 0
+    fi
+  done
+  shopt -u nullglob
+  return 1
+}
+
+current_running() {
+  read_current && run_dir_has_processes "$CURRENT_RUN_DIR"
+}
+
+target_from_args_or_current() {
+  local lab="${1:-}"
+
+  if [[ -z "$lab" ]]; then
+    if ! read_current; then
+      printf 'no current lab; specify a lab\n' >&2
+      return 1
+    fi
+    TARGET_LAB="$CURRENT_LAB"
+    return
+  fi
+
+  TARGET_LAB="$(normalize_lab "$lab")"
+  validate_lab "$TARGET_LAB"
+}
+
+target_from_logs_args() {
+  local first="${1:-}"
+  local second="${2:-}"
+
+  LOG_SERVER=""
+  if [[ -z "$first" ]]; then
+    target_from_args_or_current
+    return
+  fi
+
+  if [[ "$first" =~ ^(hub|l1|l2|l3|l3gate|rhub|rl1|rl2|rl3|nats)$ ]] && read_current; then
+    TARGET_LAB="$CURRENT_LAB"
+    LOG_SERVER="$first"
+    return
+  fi
+
+  target_from_args_or_current "$first"
+  LOG_SERVER="${second:-}"
+}
+
+require_configs() {
+  local lab="$1"
+  local name workdir conf abs_workdir found=0
+
+  while IFS='|' read -r name workdir conf; do
+    found=1
+    abs_workdir="$(lab_dir "$workdir")"
+    [[ -f "$abs_workdir/$conf" ]] || {
+      printf 'missing config for %s: %s\n' "$name" "$abs_workdir/$conf" >&2
+      return 1
+    }
+  done < <(server_specs "$lab")
+
+  [[ "$found" -eq 1 ]] || {
+    printf 'no runnable NATS config found for %s\n' "$(lab_title "$lab")" >&2
+    return 1
+  }
+}
+
+stop_run_dir() {
+  local lab="$1"
+  local dir="$2"
+  local name workdir conf pid_file pid
+
+  while IFS='|' read -r name workdir conf; do
+    pid_file="$dir/$name.pid"
+    if [[ ! -f "$pid_file" ]]; then
+      printf '%-5s not running\n' "$name"
+      continue
+    fi
+
+    pid="$(cat "$pid_file")"
+    if is_running "$pid"; then
+      kill "$pid"
+      printf '%-5s stopping pid=%s\n' "$name" "$pid"
+    else
+      printf '%-5s stale pid=%s\n' "$name" "$pid"
+    fi
+    rm -f "$pid_file"
+  done < <(server_specs "$lab")
+}
+
+maybe_stop_current_for() {
+  local lab="$1"
+
+  if ! current_running; then
+    rm -f "$CURRENT_FILE"
+    return
+  fi
+
+  if [[ "$CURRENT_LAB" == "$lab" ]]; then
+    return
+  fi
+
+  printf 'Current lab is running: %s\n' "$(lab_title "$CURRENT_LAB")"
+  printf 'Stop it and start %s? [y/N] ' "$(lab_title "$lab")"
+
+  if [[ ! -t 0 ]]; then
+    printf '\nrefusing to replace current lab without interactive confirmation\n' >&2
+    return 1
+  fi
+
+  local answer
+  read -r answer
+  case "$answer" in
+    y|Y|yes|YES)
+      stop_run_dir "$CURRENT_LAB" "$CURRENT_RUN_DIR"
+      rm -f "$CURRENT_FILE"
+      ;;
+    *)
+      printf 'leaving current lab running\n'
+      return 1
+      ;;
+  esac
+}
+
+start_lab() {
+  local lab="$1"
+  local dir name workdir conf abs_workdir pid_file log_file pid nats_server started=()
+
+  validate_lab "$lab"
+  require_configs "$lab"
+  nats_server="$(resolve_tool nats-server)" || {
+    printf 'nats-server not found; run ./workshop.sh setup\n' >&2
+    return 1
+  }
+
+  maybe_stop_current_for "$lab"
+
+  dir="$(run_dir "$lab")"
+  mkdir -p "$dir"
+
+  if run_dir_has_processes "$dir"; then
+    printf '%s is already running\n' "$(lab_title "$lab")"
+    write_current "$lab" "$dir"
+    status_lab "$lab"
+    return
+  fi
+
+  while IFS='|' read -r name workdir conf; do
+    abs_workdir="$(lab_dir "$workdir")"
+    pid_file="$dir/$name.pid"
+    log_file="$dir/$name.log"
+
+    (
+      cd "$abs_workdir"
+      exec "$nats_server" -c "$conf"
+    ) >"$log_file" 2>&1 &
+    pid="$!"
+    printf '%s\n' "$pid" > "$pid_file"
+    sleep 0.3
+
+    if ! is_running "$pid"; then
+      printf '%s exited while starting; last log lines:\n' "$name" >&2
+      tail -n 20 "$log_file" >&2 || true
+      stop_run_dir "$lab" "$dir" || true
+      return 1
+    fi
+
+    started+=("$name")
+    printf '%-5s started pid=%s log=%s\n' "$name" "$pid" "$log_file"
+  done < <(server_specs "$lab")
+
+  write_current "$lab" "$dir"
+  printf 'current lab: %s\n' "$(lab_title "$lab")"
+  status_lab "$lab"
+}
+
+stop_lab() {
+  local lab="$1"
+  local dir
+
+  validate_lab "$lab"
+  dir="$(run_dir "$lab")"
+  stop_run_dir "$lab" "$dir"
+  clear_current_if "$lab"
+}
+
+status_lab() {
+  local lab="$1"
+  local dir name workdir conf pid_file pid found=0
+
+  validate_lab "$lab"
+  dir="$(run_dir "$lab")"
+  printf '== %s ==\n' "$(lab_title "$lab")"
+
+  while IFS='|' read -r name workdir conf; do
+    found=1
+    pid_file="$dir/$name.pid"
+    if [[ -f "$pid_file" ]]; then
+      pid="$(cat "$pid_file")"
+      if is_running "$pid"; then
+        printf '%-5s running pid=%s\n' "$name" "$pid"
+      else
+        printf '%-5s stopped stale-pid=%s\n' "$name" "$pid"
+      fi
+    else
+      printf '%-5s stopped\n' "$name"
+    fi
+  done < <(server_specs "$lab")
+
+  if [[ "$found" -eq 0 ]]; then
+    printf 'no runnable NATS config found\n'
+  fi
+}
+
+logs_lab() {
+  local lab="$1"
+  local server="${2:-}"
+  local dir
+
+  validate_lab "$lab"
+  dir="$(run_dir "$lab")"
+
+  printf '== %s logs ==\n' "$(lab_title "$lab")"
+  if [[ -n "$server" ]]; then
+    [[ -f "$dir/$server.log" ]] || {
+      printf 'log not found: %s\n' "$dir/$server.log" >&2
+      return 1
+    }
+    tail -f "$dir/$server.log"
+    return
+  fi
+
+  shopt -s nullglob
+  local logs=("$dir"/*.log)
+  shopt -u nullglob
+  if [[ ${#logs[@]} -eq 0 ]]; then
+    printf 'no logs found for %s\n' "$(lab_title "$lab")" >&2
+    return 1
+  fi
+  tail -f "${logs[@]}"
+}
+
+clean_lab() {
+  local lab="$1"
+  local dir
+
+  validate_lab "$lab"
+  dir="$(run_dir "$lab")"
+  stop_run_dir "$lab" "$dir"
+  rm -rf "$dir" "$(lab_dir "$lab")/js"
+  clear_current_if "$lab"
+  printf 'cleaned %s\n' "$(lab_title "$lab")"
+}
+
+main() {
+  if [[ $# -eq 0 ]]; then
+    usage
+    exit 2
+  fi
+
+  local action="$1"
+  shift || true
+
+  case "$action" in
+    -h|--help|help)
+      usage
+      ;;
+    setup)
+      [[ $# -eq 0 ]] || {
+        usage
+        exit 2
+      }
+      setup_tools
+      ;;
+    list)
+      [[ $# -eq 0 ]] || {
+        usage
+        exit 2
+      }
+      list_labs
+      ;;
+    start)
+      [[ $# -eq 1 ]] || {
+        usage
+        exit 2
+      }
+      target_from_args_or_current "$1"
+      start_lab "$TARGET_LAB"
+      ;;
+    restart)
+      [[ $# -eq 1 ]] || {
+        usage
+        exit 2
+      }
+      target_from_args_or_current "$1"
+      stop_lab "$TARGET_LAB"
+      start_lab "$TARGET_LAB"
+      ;;
+    stop)
+      [[ $# -le 1 ]] || {
+        usage
+        exit 2
+      }
+      target_from_args_or_current "${1:-}"
+      stop_lab "$TARGET_LAB"
+      ;;
+    status)
+      [[ $# -le 1 ]] || {
+        usage
+        exit 2
+      }
+      target_from_args_or_current "${1:-}"
+      status_lab "$TARGET_LAB"
+      ;;
+    logs)
+      [[ $# -le 2 ]] || {
+        usage
+        exit 2
+      }
+      target_from_logs_args "${1:-}" "${2:-}"
+      logs_lab "$TARGET_LAB" "$LOG_SERVER"
+      ;;
+    clean)
+      [[ $# -le 1 ]] || {
+        usage
+        exit 2
+      }
+      target_from_args_or_current "${1:-}"
+      clean_lab "$TARGET_LAB"
+      ;;
+    *)
+      usage
+      exit 2
+      ;;
+  esac
+}
+
+main "$@"
