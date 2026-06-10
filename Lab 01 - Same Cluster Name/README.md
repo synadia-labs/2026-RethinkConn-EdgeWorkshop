@@ -8,25 +8,42 @@
 
 ## Setup notes
 
-Start the hub and 3 leaf nodes (follow notes in Lab #0)
+Start the hub and 3 leaf nodes
+
+```sh
+$ ../workshop.sh start 1
+```
 
 ---
 
 ## Subscription test
 
-Tests
+Run the scripted subscriber view to see which locations receive each message.
+It writes temporary logs per subscriber, tails them together with file headers,
+and removes the logs on exit:
+
+```sh
+./demo.sh
+```
+
+Or Manually:
 
 ```sh
 nats --context hub sub foo
 nats --context l1 sub foo
 nats --context l2 sub foo
 nats --context l3 sub foo
+```
 
+Then publish messages from another terminal:
+
+```sh
 nats --context hub pub foo "hello from hub"
 nats --context l1 pub foo "hello from leaf 1"
 nats --context l2 pub foo "hello from leaf 2"
 nats --context l3 pub foo "hello from leaf 3"
 ```
+
 
 Outcomes:
 
@@ -81,7 +98,7 @@ jq -r '
   .subscriptions_list[]
   | select(.account == "APP")
   | .subject
-'
+' | sort
 ```
 
 List the subscriptions subjects in the hub, that came from the leafs:
@@ -91,7 +108,7 @@ curl -s "localhost:8222/leafz?subs=1" |
 jq -r '
   .leafs[]
   | .subscriptions_list[]
-'
+' | sort
 ```
 
 List the sub subjects in the leaf 1 (:8232):
@@ -102,7 +119,7 @@ jq -r '
   .subscriptions_list[]
   | select(.account == "EDGE")
   | .subject
-'
+' | sort
 ```
 
 List the subscriptions subjects in the leaf 2 (:8242), that came from the hub:
@@ -112,7 +129,7 @@ curl -s "localhost:8242/leafz?subs=1" |
 jq -r '
   .leafs[]
   | .subscriptions_list[]
-'
+' | sort
 ```
 
 Outcomes:

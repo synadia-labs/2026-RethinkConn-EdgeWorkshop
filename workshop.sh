@@ -6,9 +6,9 @@ usage() {
 Usage:
   ./workshop.sh setup
   ./workshop.sh list
-  ./workshop.sh start <lab>
+  ./workshop.sh start <lab> [--trace]
   ./workshop.sh stop [lab]
-  ./workshop.sh restart <lab>
+  ./workshop.sh restart <lab> [--trace]
   ./workshop.sh status [lab]
   ./workshop.sh logs [lab] [server]
   ./workshop.sh clean [lab|all]
@@ -16,6 +16,7 @@ Usage:
 Examples:
   ./workshop.sh setup
   ./workshop.sh start 1
+  ./workshop.sh start 6 --trace
   ./workshop.sh start lab1
   ./workshop.sh logs
   ./workshop.sh logs hub
@@ -588,7 +589,7 @@ target_from_args_or_current() {
 
   if [[ -z "$lab" ]]; then
     if ! read_current; then
-      printf 'no current lab; specify a lab\n' >&2
+      printf 'no current lab; specify a lab or "all"\n' >&2
       return 1
     fi
     TARGET_LAB="$CURRENT_LAB"
@@ -617,6 +618,51 @@ target_from_logs_args() {
 
   target_from_args_or_current "$first"
   LOG_SERVER="${second:-}"
+}
+
+target_from_start_args() {
+  local lab=""
+
+  START_TRACE=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --trace)
+        START_TRACE=1
+        ;;
+      --)
+        shift
+        break
+        ;;
+      -*)
+        printf 'unknown start option: %s\n' "$1" >&2
+        return 1
+        ;;
+      *)
+        if [[ -n "$lab" ]]; then
+          printf 'only one lab may be specified\n' >&2
+          return 1
+        fi
+        lab="$1"
+        ;;
+    esac
+    shift
+  done
+
+  while [[ $# -gt 0 ]]; do
+    if [[ -n "$lab" ]]; then
+      printf 'only one lab may be specified\n' >&2
+      return 1
+    fi
+    lab="$1"
+    shift
+  done
+
+  if [[ -z "$lab" ]]; then
+    printf 'start requires a lab\n' >&2
+    return 1
+  fi
+
+  target_from_args_or_current "$lab"
 }
 
 require_configs() {
@@ -697,6 +743,7 @@ maybe_stop_current_for() {
 
 start_lab() {
   local lab="$1"
+  local trace="${2:-0}"
   local dir name workdir conf abs_workdir pid_file log_file pid nats_server started=()
 
   validate_lab "$lab"
@@ -718,6 +765,10 @@ start_lab() {
     return
   fi
 
+  if [[ "$trace" -eq 1 ]]; then
+    printf 'nats-server trace enabled\n'
+  fi
+
   while IFS='|' read -r name workdir conf; do
     abs_workdir="$(lab_dir "$workdir")"
     pid_file="$dir/$name.pid"
@@ -725,7 +776,11 @@ start_lab() {
 
     (
       cd "$abs_workdir"
-      exec "$nats_server" -c "$conf"
+      if [[ "$trace" -eq 1 ]]; then
+        exec "$nats_server" -c "$conf" --trace
+      else
+        exec "$nats_server" -c "$conf"
+      fi
     ) >"$log_file" 2>&1 &
     pid="$!"
     printf '%s\n' "$pid" > "$pid_file"
@@ -870,21 +925,21 @@ main() {
       list_labs
       ;;
     start)
-      [[ $# -eq 1 ]] || {
+      [[ $# -ge 1 ]] || {
         usage
         exit 2
       }
-      target_from_args_or_current "$1"
-      start_lab "$TARGET_LAB"
+      target_from_start_args "$@"
+      start_lab "$TARGET_LAB" "$START_TRACE"
       ;;
     restart)
-      [[ $# -eq 1 ]] || {
+      [[ $# -ge 1 ]] || {
         usage
         exit 2
       }
-      target_from_args_or_current "$1"
+      target_from_start_args "$@"
       stop_lab "$TARGET_LAB"
-      start_lab "$TARGET_LAB"
+      start_lab "$TARGET_LAB" "$START_TRACE"
       ;;
     stop)
       [[ $# -le 1 ]] || {

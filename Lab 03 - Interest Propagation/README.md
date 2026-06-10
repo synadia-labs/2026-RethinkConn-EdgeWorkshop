@@ -12,6 +12,19 @@ Similar setup to previous labs, but we'll start the servers with tracing on, in 
 Make sure no clients are dangling around from previous tests, they may reconnect (be safe with `killall nats`)
 
 ```sh
+$ ../workshop.sh start 1 --trace
+$ ../workshop.sh logs
+```
+
+Or
+
+```sh
+$ ../workshop.sh start 2 --trace
+$ ../workshop.sh logs
+```
+
+Or manually:
+
 # terminal 1
 nats-server -c hub.conf --trace   # blocks!
 # terminal 2
@@ -21,8 +34,6 @@ nats-server -c l2.conf --trace   # blocks!
 # terminal 4
 nats-server -c l3.conf --trace   # blocks!
 ```
-
-alternatively, add `trace:true` to the servers config files.
 
 ---
 

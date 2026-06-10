@@ -25,27 +25,8 @@ Note that the hub will still get interest from/to the leafs. There are other mec
 ## Setup
 
 ```sh
-nats-server -c hub.conf &
-nats-server -c l1.conf &
-nats-server -c l2.conf &
-nats-server -c l3.conf &
-
-nats context add hub --server a:x@:4222
-nats context add l1 --server e:x@:4232
-nats context add l2 --server e:x@:4242
-nats context add l3 --server e:x@:4252
-```
-
----
-
-## Cleanup
-
-```sh
-killall nats-server
-nats context rm -f hub
-nats context rm -f l1
-nats context rm -f l2
-nats context rm -f l3
+../workshop.sh start 5
+../workshop.sh logs
 ```
 
 ---

@@ -13,6 +13,16 @@ leafnodes {
 }
 ```
 
+```sh
+$ ../workshop.sh start 4 --trace
+```
+
+Note the lack of subject interest propagation between the leafs despite different cluster names.
+
+```sh
+nats --context l1 sub foo bar baz
+```
+
 There are some subtle differences between isolate and same-cluster-names. Covered in Lab #5.
 
 ---
