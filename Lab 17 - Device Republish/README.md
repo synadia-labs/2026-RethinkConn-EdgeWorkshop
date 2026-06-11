@@ -49,6 +49,7 @@ To create the streams in each leaf:
 for i in {1..3}; do
   nats --context l$i stream add LMUX \
     --subjects="lmux.L$i.>","lmux.ALL.>" \
+    --storage=memory \
     --no-ack \
     --retention=limits \
     --discard=old \

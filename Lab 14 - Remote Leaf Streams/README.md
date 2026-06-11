@@ -6,7 +6,8 @@
 - leaf 3 - very restricted accesss: just to an existing (pre-created) _pull_ consumer in the leaf
 
 Important: $JS.ACK.> (consumer acks) and $JS.FC.> (consumer flow control) are not JS Domain aware. Make sure STREAMNAME+CONSUMERNAME are unique from the hub perspective.
-Placing the leaf JS Domain name as part of the consumer names will meet that requirement.  Mirror/Sourcing will create random consumer names and meet the requirement too.
+Placing the leaf JS Domain name as part of the consumer names will meet that requirement. For cross-account stream sharing, adding the account may help too.  Mirror/Sourcing will create random consumer names and meet the requirement too.
+NATS 2.14 is adding domain/account safe APIs for these two; they will be fully enabled in 2.15 ([https://docs.nats.io/release-notes/whats_new/whats_new_214#domain-aware-acknowledgement-and-flow-control-subjects])
 
 ---
 

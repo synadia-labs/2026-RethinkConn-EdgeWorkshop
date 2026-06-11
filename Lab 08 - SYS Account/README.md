@@ -92,8 +92,7 @@ jq -r '
 '
 ```
 
-
-Tell all the servers to reload their config:
+Another usefull command in the system account: tell all the servers to reload their config:
 
 ```sh
 nats --context=syshub request '$SYS.REQ.SERVER.PING' "" --replies=0 --timeout=1s --raw | \

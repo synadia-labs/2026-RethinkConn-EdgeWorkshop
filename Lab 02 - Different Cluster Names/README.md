@@ -14,7 +14,7 @@ Updated configs but same setup and test commands as Lab #1.
 ../workshop.sh start 2
 ```
 
-Direct equivalent, from this lab directory:
+Direct equivalent, from this lab directory, in four terminals:
 
 ```sh
 # terminal 1
@@ -45,7 +45,7 @@ Create a subscription from the hub and each leaf:
 ./demo.sh
 ```
 
-Or
+Or in 4 terminals:
 
 ```sh
 nats --context hub sub foo.hub
@@ -78,6 +78,16 @@ jq -r '
 List the subscriptions subjects in the leaf 1 (:8232), that came from the hub:
 
 ```sh
+curl -s "localhost:8232/leafz?subs=1" |
+jq -r '
+  .leafs[]
+  | .subscriptions_list[]
+' | sort
+```
+
+List the subscriptions subjects in the leaf 2 (:8242), that came from the hub:
+
+```sh
 curl -s "localhost:8242/leafz?subs=1" |
 jq -r '
   .leafs[]
@@ -85,11 +95,13 @@ jq -r '
 ' | sort
 ```
 
-The subscriptions from the hub and other leaf nodes should be present.
+The subscriptions from the hub and other leaf nodes should be present in the leafs.
+
+Repeat the tests of previous lab too, and see the effect of many subjects for comparison.
 
 Outcomes:
 
-- Local subs in the leaf 1 propagate up to the hub, and to the other leafs  (east-west enabled as leafs use different cluster name)
-- Subject cardinality matters - subs to different subjects (vs same one) have a bigger impact on the hub AND the leafs
+- Local subs in each leaf propagate up to the hub, and to the other leafs  (east-west enabled as leafs use different cluster name)
+- Again, subject cardinality matters - subs to different subjects (vs same one) have a bigger impact on the hub AND the leafs
 
 ---

@@ -1,10 +1,10 @@
 # Lab #12 - Locked down leafs
 
-- Not really a lab, but a starting point to unlock subjects as needed in the next few labs
-- Hub + leafs, different cluster names, East-West disabled
-- North-South all locked down, except a couple subjects
+- Not really a lab, but a starting point to unlock subjects as needed in the next few labs.
+- Hub + leafs, different cluster names, East-West disabled.
+- North-South all locked down, except a couple subjects.
 - Whenever unlocking any new subjects --> consider the implications: cardinality, frequency of sub/unsub...
-- Alternative: leave everything open (up to security boundaries), perform subject interest analysis _under load or real deployment_, and tune based on that
+- Alternative: leave everything open (up to security boundaries), perform subject interest analysis _under load or real deployment_, and tune based on that.
 
 ---
 
@@ -48,13 +48,7 @@ Cross-domain JetStream access will need some subjects open leaf->hub and hub->le
 
 JetStream API is documented (mostly...): [https://docs.nats.io/reference/reference-protocols/nats_api_reference]
 
-Something that will help _a lot_ with any loose ends --> Keep these running while testing/debugging issues:
-
-```sh
-./demo.sh
-```
-
-Or manually:
+Docs are not perfect, something that will help _a lot_ with any loose ends --> Keep these running while testing/debugging issues:
 
 ```sh
 # in different terminals:
@@ -68,9 +62,9 @@ This will help detecting protocol messages seen in one side but not on the other
 
 ## `_INBOX.>`
 
-- It is almost unavoidable opening this one in both directions.
+- It is almost unavoidable opening this one in both directions, but depends on the use of custom subject prefixes.
 - This is usually a high cardinality & high frequency (sub/unsub) subject set --> memory pressure (interest graphs) in the servers, potentially network pressure.
 - Inbox multiplexing and custom inbox prefixes may help to minimize impact.
-- Some upcoming improvements in NATS will help.
+- Some upcoming improvements in NATS will make this trivial.
 
 ---

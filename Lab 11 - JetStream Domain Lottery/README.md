@@ -85,6 +85,7 @@ nats --context hub --js-domain L stream info TELEMETRY
 We get responses from the 3 leaf nodes, nats-cli will pick whichever gets back first.
 
 As all leafs have the same domain, they listen in the same API `$JS.L.API.>`. The hub is sending the command to all of them.
+
 If you question why the request is not send to only one of them, round-robin (as with regular dqueue service pools in NATS): this is related to how Domains work internally (using account subject mapping in leaf nodes). It is an internal implementation detail, and could change in the future.
 
 Another messy test - Let's create from the hub a stream in the L domain:
@@ -96,8 +97,11 @@ nats --context hub --js-domain L stream add FOO --subjects="foo.>" --defaults
 You'll see just one of the responses returned by nats-cli (random, fastest leaf), but look, we created a stream in every leaf node!!
 
 ```sh
+echo "-- leaf 1 --"
 nats --context l1 stream ls
+echo "-- leaf 2 --"
 nats --context l2 stream ls
+echo "-- leaf 3 --"
 nats --context l3 stream ls
 ```
 
@@ -126,6 +130,6 @@ nats --context l1 stream info FOO --js-domain ......mmmmmm...what??
 
 Right, we can't complete that command. We can't reach the $JS API in the hub from the leaf, as there is no JS domain name defined for the hub.
 
-So if the leafs need to access streams in the hub (directoy or for sourcing/mirroring) the hub also needs a domain name.
+So if the leafs need to access streams in the hub (directoy or for sourcing/mirroring) the hub also needs a domain name!
 
 ---

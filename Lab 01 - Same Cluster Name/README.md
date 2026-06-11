@@ -39,7 +39,7 @@ and removes the logs on exit:
 ./demo.sh
 ```
 
-Or Manually:
+Or manually in 4 terminals:
 
 ```sh
 nats --context hub sub foo
@@ -56,7 +56,6 @@ nats --context l1 pub foo "hello from leaf 1"
 nats --context l2 pub foo "hello from leaf 2"
 nats --context l3 pub foo "hello from leaf 3"
 ```
-
 
 Outcomes:
 
@@ -79,7 +78,7 @@ For #2 we can start 100 subs in leaf 1, same subject foo:
 nats --context l1 bench sub foo --clients=100 --no-progress
 ```
 
-For #3, 100 service requesters will create a bunch of different inboxes where they expect a response:
+For #3, 100 service requesters will create a bunch of different inboxes where they expect a response. Use two terminals for this:
 
 ```sh
 # fake no-responder service(needed to avoid no-responders fast fail)
@@ -148,6 +147,6 @@ jq -r '
 Outcomes:
 
 - Local subs in the leaf 1 propagate up to the hub, but not the the other leafs (east-west disabled as leafs use same cluster name)
-- Subject cardinality matters - subs to different subjects (vs same one) have bigger impact on the hub.
+- Subject cardinality matters - subs to different subjects (vs same one) have bigger impact on the hub
 
 ---

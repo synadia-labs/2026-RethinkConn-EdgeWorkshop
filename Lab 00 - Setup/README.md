@@ -66,8 +66,8 @@ directory:
 Each lab uses its own config files. The helper starts `nats-server -c <config>`
 from the lab directory.
 
-The direct equivalent is to run each server config from the lab directory, one
-per terminal:
+The direct equivalent is to run each server config from the lab directory, in four terminals
+(or one terminal if OK with mingled logs, use `&` to background each server):
 
 ```sh
 # terminal 1

@@ -15,7 +15,7 @@ It is now possible to configure leafnode subject interest isolation in three way
 1. For all leafnode connections on the hub using the top-level `isolate_leafnode_interest` or `isolate` option in the leafnodes block
 2. Asking the remote side to isolate us from east-west interest originating remotely using the `request_isolation` option in the remotes config (which, in turn, adds the isolate flag into the leaf CONNECT info)
 
-The reverse-connection form, where the hub connects to leafs with `remotes[].hub:true`, is covered in Lab 06.
+The reverse-connection form, where the hub connects to leafs with `remotes[].hub:true`, is covered in Lab #06.
 
 https://github.com/nats-io/nats-server/pull/7277
 
@@ -56,10 +56,12 @@ Run the scripted subscriber view to see which leafs receive each message:
 Or manually:
 
 ```sh
+# in 3 terminals
 nats --context l1 sub foo
 nats --context l2 sub foo
 nats --context l3 sub foo
 
+# then send some messages
 nats --context hub pub foo "hello from hub"
 nats --context l1 pub foo "hello from leaf 1"
 nats --context l2 pub foo "hello from leaf 2"
