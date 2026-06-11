@@ -21,11 +21,11 @@ const (
 
 func main() {
 	var (
-		node      = flag.String("node", "l1", "NATS CLI context or workshop node name to connect to")
-		serverURL = flag.String("url", "", "explicit NATS server URL; overrides --node")
-		count     = flag.Int("count", 1000, "number of unique subscriptions to create")
-		prefix    = flag.String("prefix", "edge.device", "subject prefix")
-		duration  = flag.Duration("duration", 0, "hold duration after subscriptions are created; 0 waits until interrupted")
+		natsContext = flag.String("context", "l1", "NATS CLI context to connect to")
+		serverURL   = flag.String("url", "", "explicit NATS server URL; overrides --context")
+		count       = flag.Int("count", 1000, "number of unique subscriptions to create")
+		prefix      = flag.String("prefix", "edge.device", "subject prefix")
+		duration    = flag.Duration("duration", 0, "hold duration after subscriptions are created; 0 waits until interrupted")
 	)
 	flag.Parse()
 
@@ -37,7 +37,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	target, err := resolveConnectTarget(*node, *serverURL)
+	target, err := resolveConnectTarget(*natsContext, *serverURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "resolve target failed: %v\n", err)
 		os.Exit(2)
@@ -100,24 +100,24 @@ func (target connectTarget) description() string {
 	return fmt.Sprintf("%s (%s)", target.name, target.url)
 }
 
-func resolveConnectTarget(node, explicitURL string) (connectTarget, error) {
+func resolveConnectTarget(natsContext, explicitURL string) (connectTarget, error) {
 	explicitURL = strings.TrimSpace(explicitURL)
 	if explicitURL != "" {
 		return connectTarget{url: explicitURL}, nil
 	}
 
-	node = strings.TrimSpace(node)
-	if node == "" {
+	natsContext = strings.TrimSpace(natsContext)
+	if natsContext == "" {
 		return connectTarget{}, fmt.Errorf("node must not be empty")
 	}
-	if strings.Contains(node, "://") {
-		return connectTarget{url: node}, nil
+	if strings.Contains(natsContext, "://") {
+		return connectTarget{url: natsContext}, nil
 	}
 
-	if nctx, err := natscontext.New(node, true); err == nil {
+	if nctx, err := natscontext.New(natsContext, true); err == nil {
 		return contextConnectTarget(nctx)
 	} else {
-		return connectTarget{}, fmt.Errorf("resolve node %q: %w", node, err)
+		return connectTarget{}, fmt.Errorf("resolve node %q: %w", natsContext, err)
 	}
 }
 

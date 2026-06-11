@@ -23,8 +23,8 @@ type clientHandle struct {
 
 func main() {
 	var (
-		node          = flag.String("node", "l1", "NATS CLI context or workshop node name for simulated clients")
-		serverURL     = flag.String("url", "", "explicit NATS server URL for simulated clients; overrides --node")
+		natsContext   = flag.String("context", "l1", "NATS CLI context to connect to")
+		serverURL     = flag.String("url", "", "explicit NATS server URL for simulated clients; overrides --context")
 		clients       = flag.Int("clients", 100, "number of simulated leaf clients")
 		serviceList   = flag.String("services", "X,Y,Z", "comma-separated backing service names per client")
 		subjectPrefix = flag.String("subject-prefix", "client", "request subject prefix")
@@ -45,7 +45,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	target, err := resolveConnectTarget(*node, *serverURL)
+	target, err := resolveConnectTarget(*natsContext, *serverURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func init() {
 		fmt.Fprintln(flag.CommandLine.Output())
 		fmt.Fprintln(flag.CommandLine.Output(), "Examples:")
 		fmt.Fprintln(flag.CommandLine.Output(), "  go run tools/responders/main.go --clients=100")
-		fmt.Fprintln(flag.CommandLine.Output(), "  go run tools/responders/main.go --node=l2 --clients=100")
+		fmt.Fprintln(flag.CommandLine.Output(), "  go run tools/responders/main.go --context=l2 --clients=100")
 		fmt.Fprintln(flag.CommandLine.Output(), "  go run tools/responders/main.go --clients=100 --mux")
 	}
 }
@@ -260,24 +260,24 @@ func (target connectTarget) description() string {
 	return fmt.Sprintf("%s (%s)", target.name, target.url)
 }
 
-func resolveConnectTarget(node, explicitURL string) (connectTarget, error) {
+func resolveConnectTarget(natsContext, explicitURL string) (connectTarget, error) {
 	explicitURL = strings.TrimSpace(explicitURL)
 	if explicitURL != "" {
 		return connectTarget{url: explicitURL}, nil
 	}
 
-	node = strings.TrimSpace(node)
-	if node == "" {
+	natsContext = strings.TrimSpace(natsContext)
+	if natsContext == "" {
 		return connectTarget{}, fmt.Errorf("node must not be empty")
 	}
-	if strings.Contains(node, "://") {
-		return connectTarget{url: node}, nil
+	if strings.Contains(natsContext, "://") {
+		return connectTarget{url: natsContext}, nil
 	}
 
-	if nctx, err := natscontext.New(node, true); err == nil {
+	if nctx, err := natscontext.New(natsContext, true); err == nil {
 		return contextConnectTarget(nctx)
 	} else {
-		return connectTarget{}, fmt.Errorf("resolve node %q: %w", node, err)
+		return connectTarget{}, fmt.Errorf("resolve node %q: %w", natsContext, err)
 	}
 }
 

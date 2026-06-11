@@ -61,8 +61,8 @@ go run tools/responders/main.go
 
 The app keeps 100 simulated leaf clients connected. Each client subscribes to
 three request subjects, so it creates roughly 300 leaf-side subscriptions before
-any requester traffic. The default target is `l1`; use `--node=l2` or
-`--node=l3` to place the simulated clients on another leaf.
+any requester traffic. The default target is `l1`; use `--context=l2` or
+`--context=l3` to place the simulated clients on another leaf.
 
 Send requests from another terminal:
 

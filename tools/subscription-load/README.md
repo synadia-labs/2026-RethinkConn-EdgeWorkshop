@@ -5,7 +5,7 @@ This is useful when a lab needs visible subject-interest growth in
 `scripts/monitor.sh`.
 
 ```sh
-go run tools/subscription-load/main.go --node=l1 --count=1000 --prefix=edge.device
+go run tools/subscription-load/main.go --context=l1 --count=1000 --prefix=edge.device
 ```
 
 Subjects are created as:

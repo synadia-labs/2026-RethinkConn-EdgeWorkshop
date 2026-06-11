@@ -20,7 +20,7 @@ Run from the repository root:
 
 ```sh
 go run tools/responders/main.go
-go run tools/responders/main.go --node=l2
+go run tools/responders/main.go --context=l2
 go run tools/responders/main.go --mux
 go run tools/responders/main.go --clients=25 --services=X,Y,Z --mux
 ```
