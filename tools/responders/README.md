@@ -20,11 +20,15 @@ Run from the repository root:
 
 ```sh
 go run tools/responders/main.go
+go run tools/responders/main.go --node=l2
 go run tools/responders/main.go --mux
 go run tools/responders/main.go --clients=25 --services=X,Y,Z --mux
 ```
 
 Useful with `scripts/monitor.sh` while a lab topology is running.
+The default node is `l1`. Node names resolve through matching NATS CLI
+contexts when present, with workshop defaults for `hub`, `l1`, `l2`, and `l3`.
+Use `--url` for an explicit server URL.
 
 Options:
 

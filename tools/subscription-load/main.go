@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/nats-io/jsm.go/natscontext"
 	"github.com/nats-io/nats.go"
 )
 
@@ -19,10 +21,11 @@ const (
 
 func main() {
 	var (
-		url      = flag.String("url", "nats://e:x@127.0.0.1:4232", "NATS server URL")
-		count    = flag.Int("count", 1000, "number of unique subscriptions to create")
-		prefix   = flag.String("prefix", "edge.device", "subject prefix")
-		duration = flag.Duration("duration", 0, "hold duration after subscriptions are created; 0 waits until interrupted")
+		node      = flag.String("node", "l1", "NATS CLI context or workshop node name to connect to")
+		serverURL = flag.String("url", "", "explicit NATS server URL; overrides --node")
+		count     = flag.Int("count", 1000, "number of unique subscriptions to create")
+		prefix    = flag.String("prefix", "edge.device", "subject prefix")
+		duration  = flag.Duration("duration", 0, "hold duration after subscriptions are created; 0 waits until interrupted")
 	)
 	flag.Parse()
 
@@ -34,7 +37,16 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	nc, err := nats.Connect(*url, nats.Name("subscription-load"))
+	target, err := resolveConnectTarget(*node, *serverURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "resolve target failed: %v\n", err)
+		os.Exit(2)
+	}
+
+	opts := make([]nats.Option, 0, len(target.options)+2)
+	opts = append(opts, target.options...)
+	opts = append(opts, nats.Name("subscription-load"), nats.NoReconnect())
+	nc, err := nats.Connect(target.url, opts...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "connect failed: %v\n", err)
 		os.Exit(1)
@@ -67,7 +79,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("ready: %d subscriptions on %s.* via %s in %s\n", created.Load(), *prefix, *url, time.Since(start).Round(time.Millisecond))
+	fmt.Printf("ready: %d subscriptions on %s.* via %s in %s\n", created.Load(), *prefix, target.description(), time.Since(start).Round(time.Millisecond))
 	if *duration > 0 {
 		select {
 		case <-ctx.Done():
@@ -76,4 +88,43 @@ func main() {
 		return
 	}
 	<-ctx.Done()
+}
+
+type connectTarget struct {
+	name    string
+	url     string
+	options []nats.Option
+}
+
+func (target connectTarget) description() string {
+	return fmt.Sprintf("%s (%s)", target.name, target.url)
+}
+
+func resolveConnectTarget(node, explicitURL string) (connectTarget, error) {
+	explicitURL = strings.TrimSpace(explicitURL)
+	if explicitURL != "" {
+		return connectTarget{url: explicitURL}, nil
+	}
+
+	node = strings.TrimSpace(node)
+	if node == "" {
+		return connectTarget{}, fmt.Errorf("node must not be empty")
+	}
+	if strings.Contains(node, "://") {
+		return connectTarget{url: node}, nil
+	}
+
+	if nctx, err := natscontext.New(node, true); err == nil {
+		return contextConnectTarget(nctx)
+	} else {
+		return connectTarget{}, fmt.Errorf("resolve node %q: %w", node, err)
+	}
+}
+
+func contextConnectTarget(nctx *natscontext.Context) (connectTarget, error) {
+	options, err := nctx.NATSOptions()
+	if err != nil {
+		return connectTarget{}, err
+	}
+	return connectTarget{name: nctx.Name, url: nctx.ServerURL(), options: options}, nil
 }

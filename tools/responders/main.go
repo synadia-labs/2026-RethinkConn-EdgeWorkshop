@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nats-io/jsm.go/natscontext"
 	"github.com/nats-io/nats.go"
 )
 
@@ -22,7 +23,8 @@ type clientHandle struct {
 
 func main() {
 	var (
-		leafURL       = flag.String("leaf-url", "nats://e:x@localhost:4232", "NATS URL for simulated clients on the leaf")
+		node          = flag.String("node", "l1", "NATS CLI context or workshop node name for simulated clients")
+		serverURL     = flag.String("url", "", "explicit NATS server URL for simulated clients; overrides --node")
 		clients       = flag.Int("clients", 100, "number of simulated leaf clients")
 		serviceList   = flag.String("services", "X,Y,Z", "comma-separated backing service names per client")
 		subjectPrefix = flag.String("subject-prefix", "client", "request subject prefix")
@@ -43,7 +45,12 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	handles, err := startClients(*leafURL, *subjectPrefix, *clients, services, *mux)
+	target, err := resolveConnectTarget(*node, *serverURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	handles, err := startClients(target, *subjectPrefix, *clients, services, *mux)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -58,6 +65,7 @@ func main() {
 
 	fmt.Printf("mode=%s clients=%d services=%s expected_leaf_subscriptions=%d\n",
 		mode, *clients, strings.Join(services, ","), subCount)
+	fmt.Printf("connected_to=%s\n", target.description())
 	if *mux {
 		fmt.Printf("each client subscribes to %s.<client>.> and routes the suffix to a backing service\n", *subjectPrefix)
 	} else {
@@ -99,15 +107,17 @@ func parseServices(raw string) []string {
 	return services
 }
 
-func startClients(url, prefix string, clients int, services []string, mux bool) ([]*clientHandle, error) {
+func startClients(target connectTarget, prefix string, clients int, services []string, mux bool) ([]*clientHandle, error) {
 	handles := make([]*clientHandle, 0, clients)
 
 	for id := 1; id <= clients; id++ {
-		nc, err := nats.Connect(
-			url,
+		opts := make([]nats.Option, 0, len(target.options)+2)
+		opts = append(opts, target.options...)
+		opts = append(opts,
 			nats.Name(fmt.Sprintf("responder-client-%03d", id)),
 			nats.NoReconnect(),
 		)
+		nc, err := nats.Connect(target.url, opts...)
 		if err != nil {
 			closeClients(handles)
 			return nil, fmt.Errorf("connect client %03d: %w", id, err)
@@ -235,6 +245,46 @@ func init() {
 		fmt.Fprintln(flag.CommandLine.Output())
 		fmt.Fprintln(flag.CommandLine.Output(), "Examples:")
 		fmt.Fprintln(flag.CommandLine.Output(), "  go run tools/responders/main.go --clients=100")
+		fmt.Fprintln(flag.CommandLine.Output(), "  go run tools/responders/main.go --node=l2 --clients=100")
 		fmt.Fprintln(flag.CommandLine.Output(), "  go run tools/responders/main.go --clients=100 --mux")
 	}
+}
+
+type connectTarget struct {
+	name    string
+	url     string
+	options []nats.Option
+}
+
+func (target connectTarget) description() string {
+	return fmt.Sprintf("%s (%s)", target.name, target.url)
+}
+
+func resolveConnectTarget(node, explicitURL string) (connectTarget, error) {
+	explicitURL = strings.TrimSpace(explicitURL)
+	if explicitURL != "" {
+		return connectTarget{url: explicitURL}, nil
+	}
+
+	node = strings.TrimSpace(node)
+	if node == "" {
+		return connectTarget{}, fmt.Errorf("node must not be empty")
+	}
+	if strings.Contains(node, "://") {
+		return connectTarget{url: node}, nil
+	}
+
+	if nctx, err := natscontext.New(node, true); err == nil {
+		return contextConnectTarget(nctx)
+	} else {
+		return connectTarget{}, fmt.Errorf("resolve node %q: %w", node, err)
+	}
+}
+
+func contextConnectTarget(nctx *natscontext.Context) (connectTarget, error) {
+	options, err := nctx.NATSOptions()
+	if err != nil {
+		return connectTarget{}, err
+	}
+	return connectTarget{name: nctx.Name, url: nctx.ServerURL(), options: options}, nil
 }
