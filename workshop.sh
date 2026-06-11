@@ -6,9 +6,9 @@ usage() {
 Usage:
   ./workshop.sh setup
   ./workshop.sh list
-  ./workshop.sh start <lab> [--trace]
+  ./workshop.sh start <lab> [config-dir] [--trace]
   ./workshop.sh stop [lab]
-  ./workshop.sh restart <lab> [--trace]
+  ./workshop.sh restart <lab> [config-dir] [--trace]
   ./workshop.sh status [lab]
   ./workshop.sh logs [lab] [server]
   ./workshop.sh clean [lab|all]
@@ -17,6 +17,7 @@ Examples:
   ./workshop.sh setup
   ./workshop.sh start 1
   ./workshop.sh start 6 --trace
+  ./workshop.sh start 20 open
   ./workshop.sh start lab1
   ./workshop.sh logs
   ./workshop.sh logs hub
@@ -380,6 +381,43 @@ lab_dir() {
   printf '%s/%s\n' "$ROOT" "$title"
 }
 
+validate_config_dir_name() {
+  local config_dir="$1"
+
+  [[ -n "$config_dir" ]] || return 0
+  case "$config_dir" in
+    /*|.*|*/*|*..*)
+      printf 'config-dir must be a direct child directory name inside the lab: %s\n' "$config_dir" >&2
+      return 1
+      ;;
+  esac
+}
+
+lab_config_dir() {
+  local lab="$1"
+  local config_dir="${2:-}"
+  local dir
+
+  dir="$(lab_dir "$lab")" || return 1
+  if [[ -n "$config_dir" ]]; then
+    validate_config_dir_name "$config_dir" || return 1
+    dir="$dir/$config_dir"
+  fi
+
+  printf '%s\n' "$dir"
+}
+
+target_title() {
+  local lab="$1"
+  local config_dir="${2:-}"
+
+  if [[ -n "$config_dir" ]]; then
+    printf '%s / %s\n' "$(lab_title "$lab")" "$config_dir"
+  else
+    lab_title "$lab"
+  fi
+}
+
 known_labs() {
   local dir base
 
@@ -415,19 +453,20 @@ validate_lab() {
 
 server_specs() {
   local lab="$1"
+  local config_dir="${2:-}"
   local dir
-  dir="$(lab_dir "$lab")"
+  dir="$(lab_config_dir "$lab" "$config_dir")" || return 1
 
   if [[ -f "$dir/hub.conf" ]]; then
-    [[ -f "$dir/hub.conf" ]] && printf '%s|%s|%s\n' hub "$lab" hub.conf
-    [[ -f "$dir/l1.conf" ]] && printf '%s|%s|%s\n' l1 "$lab" l1.conf
-    [[ -f "$dir/l2.conf" ]] && printf '%s|%s|%s\n' l2 "$lab" l2.conf
-    [[ -f "$dir/l3.conf" ]] && printf '%s|%s|%s\n' l3 "$lab" l3.conf
+    [[ -f "$dir/hub.conf" ]] && printf '%s|%s|%s\n' hub "$dir" hub.conf
+    [[ -f "$dir/l1.conf" ]] && printf '%s|%s|%s\n' l1 "$dir" l1.conf
+    [[ -f "$dir/l2.conf" ]] && printf '%s|%s|%s\n' l2 "$dir" l2.conf
+    [[ -f "$dir/l3.conf" ]] && printf '%s|%s|%s\n' l3 "$dir" l3.conf
     return
   fi
 
   if [[ -f "$dir/server.conf" ]]; then
-    printf '%s|%s|%s\n' nats "$lab" server.conf
+    printf '%s|%s|%s\n' nats "$dir" server.conf
     return
   fi
 }
@@ -571,24 +610,29 @@ remove_contexts_if_possible() {
 
 lab_run_key() {
   local lab="$1"
+  local config_dir="${2:-}"
   local number
+  local key
 
   if number="$(lab_number_from_name "$lab" 2>/dev/null)"; then
-    printf 'lab%s\n' "$number"
-    return
+    key="lab$number"
+  elif [[ "$lab" =~ ^[Ll][Aa][Bb]([0-9]+)$ ]]; then
+    key="lab$((10#${BASH_REMATCH[1]}))"
+  else
+    key="$lab"
   fi
 
-  if [[ "$lab" =~ ^[Ll][Aa][Bb]([0-9]+)$ ]]; then
-    printf 'lab%s\n' "$((10#${BASH_REMATCH[1]}))"
-    return
+  if [[ -n "$config_dir" ]]; then
+    key="$key-${config_dir//[^A-Za-z0-9._-]/_}"
   fi
 
-  printf '%s\n' "$lab"
+  printf '%s\n' "$key"
 }
 
 run_dir() {
   local lab="$1"
-  printf '%s/%s\n' "$RUNS_DIR" "$(lab_run_key "$lab")"
+  local config_dir="${2:-}"
+  printf '%s/%s\n' "$RUNS_DIR" "$(lab_run_key "$lab" "$config_dir")"
 }
 
 read_current() {
@@ -606,8 +650,10 @@ read_current() {
   fi
 
   if [[ -n "${third:-}" ]]; then
+    CURRENT_CONFIG_DIR="${second:-}"
     CURRENT_RUN_DIR="$third"
   else
+    CURRENT_CONFIG_DIR=""
     CURRENT_RUN_DIR="$second"
   fi
 
@@ -616,14 +662,22 @@ read_current() {
 
 write_current() {
   local lab="$1"
-  local dir="$2"
+  local config_dir="${2:-}"
+  local dir="${3:-}"
+
+  if [[ -z "$dir" ]]; then
+    dir="$config_dir"
+    config_dir=""
+  fi
+
   mkdir -p "$STATE_DIR"
-  printf '%s\t%s\n' "$lab" "$dir" > "$CURRENT_FILE"
+  printf '%s\t%s\t%s\n' "$lab" "$config_dir" "$dir" > "$CURRENT_FILE"
 }
 
 clear_current_if() {
   local lab="$1"
-  if read_current && [[ "$CURRENT_LAB" == "$lab" ]]; then
+  local config_dir="${2:-}"
+  if read_current && [[ "$CURRENT_LAB" == "$lab" && ( -z "$config_dir" || "${CURRENT_CONFIG_DIR:-}" == "$config_dir" ) ]]; then
     rm -f "$CURRENT_FILE"
   fi
 }
@@ -656,11 +710,17 @@ target_from_args_or_current() {
       return 1
     fi
     TARGET_LAB="$CURRENT_LAB"
+    TARGET_CONFIG_DIR="${CURRENT_CONFIG_DIR:-}"
     return
   fi
 
   TARGET_LAB="$(normalize_lab "$lab")"
   validate_lab "$TARGET_LAB"
+  TARGET_CONFIG_DIR=""
+
+  if read_current && [[ "$CURRENT_LAB" == "$TARGET_LAB" ]]; then
+    TARGET_CONFIG_DIR="${CURRENT_CONFIG_DIR:-}"
+  fi
 }
 
 target_from_logs_args() {
@@ -675,6 +735,7 @@ target_from_logs_args() {
 
   if [[ "$first" =~ ^(hub|l1|l2|l3|l3gate|nats)$ ]] && read_current; then
     TARGET_LAB="$CURRENT_LAB"
+    TARGET_CONFIG_DIR="${CURRENT_CONFIG_DIR:-}"
     LOG_SERVER="$first"
     return
   fi
@@ -685,6 +746,7 @@ target_from_logs_args() {
 
 target_from_start_args() {
   local lab=""
+  local config_dir=""
 
   START_TRACE=0
   while [[ $# -gt 0 ]]; do
@@ -701,22 +763,28 @@ target_from_start_args() {
         return 1
         ;;
       *)
-        if [[ -n "$lab" ]]; then
-          printf 'only one lab may be specified\n' >&2
+        if [[ -z "$lab" ]]; then
+          lab="$1"
+        elif [[ -z "$config_dir" ]]; then
+          config_dir="$1"
+        else
+          printf 'only one config directory may be specified\n' >&2
           return 1
         fi
-        lab="$1"
         ;;
     esac
     shift
   done
 
   while [[ $# -gt 0 ]]; do
-    if [[ -n "$lab" ]]; then
-      printf 'only one lab may be specified\n' >&2
+    if [[ -z "$lab" ]]; then
+      lab="$1"
+    elif [[ -z "$config_dir" ]]; then
+      config_dir="$1"
+    else
+      printf 'only one config directory may be specified\n' >&2
       return 1
     fi
-    lab="$1"
     shift
   done
 
@@ -726,23 +794,31 @@ target_from_start_args() {
   fi
 
   target_from_args_or_current "$lab"
+  START_CONFIG_DIR="$config_dir"
+  validate_config_dir_name "$START_CONFIG_DIR"
 }
 
 require_configs() {
   local lab="$1"
-  local name workdir conf abs_workdir found=0
+  local config_dir="${2:-}"
+  local config_abs name workdir conf found=0
+
+  config_abs="$(lab_config_dir "$lab" "$config_dir")" || return 1
+  [[ -d "$config_abs" ]] || {
+    printf 'config directory not found: %s\n' "$config_abs" >&2
+    return 1
+  }
 
   while IFS='|' read -r name workdir conf; do
     found=1
-    abs_workdir="$(lab_dir "$workdir")"
-    [[ -f "$abs_workdir/$conf" ]] || {
-      printf 'missing config for %s: %s\n' "$name" "$abs_workdir/$conf" >&2
+    [[ -f "$workdir/$conf" ]] || {
+      printf 'missing config for %s: %s\n' "$name" "$workdir/$conf" >&2
       return 1
     }
-  done < <(server_specs "$lab")
+  done < <(server_specs "$lab" "$config_dir")
 
   [[ "$found" -eq 1 ]] || {
-    printf 'no runnable NATS config found for %s\n' "$(lab_title "$lab")" >&2
+    printf 'no runnable NATS config found for %s\n' "$(target_title "$lab" "$config_dir")" >&2
     return 1
   }
 }
@@ -750,6 +826,7 @@ require_configs() {
 stop_run_dir() {
   local lab="$1"
   local dir="$2"
+  local config_dir="${3:-}"
   local name workdir conf pid_file pid
 
   while IFS='|' read -r name workdir conf; do
@@ -767,23 +844,24 @@ stop_run_dir() {
       printf '%-5s stale pid=%s\n' "$name" "$pid"
     fi
     rm -f "$pid_file"
-  done < <(server_specs "$lab")
+  done < <(server_specs "$lab" "$config_dir")
 }
 
 maybe_stop_current_for() {
   local lab="$1"
+  local config_dir="${2:-}"
 
   if ! current_running; then
     rm -f "$CURRENT_FILE"
     return
   fi
 
-  if [[ "$CURRENT_LAB" == "$lab" ]]; then
+  if [[ "$CURRENT_LAB" == "$lab" && "${CURRENT_CONFIG_DIR:-}" == "$config_dir" ]]; then
     return
   fi
 
-  printf 'Current lab is running: %s\n' "$(lab_title "$CURRENT_LAB")"
-  printf 'Stop it and start %s? [y/N] ' "$(lab_title "$lab")"
+  printf 'Current lab is running: %s\n' "$(target_title "$CURRENT_LAB" "${CURRENT_CONFIG_DIR:-}")"
+  printf 'Stop it and start %s? [y/N] ' "$(target_title "$lab" "$config_dir")"
 
   if [[ ! -t 0 ]]; then
     printf '\nrefusing to replace current lab without interactive confirmation\n' >&2
@@ -794,7 +872,7 @@ maybe_stop_current_for() {
   read -r answer
   case "$answer" in
     y|Y|yes|YES)
-      stop_run_dir "$CURRENT_LAB" "$CURRENT_RUN_DIR"
+      stop_run_dir "$CURRENT_LAB" "$CURRENT_RUN_DIR" "${CURRENT_CONFIG_DIR:-}"
       rm -f "$CURRENT_FILE"
       ;;
     *)
@@ -807,24 +885,25 @@ maybe_stop_current_for() {
 start_lab() {
   local lab="$1"
   local trace="${2:-0}"
-  local dir name workdir conf abs_workdir pid_file log_file pid nats_server started=()
+  local config_dir="${3:-}"
+  local dir name workdir conf pid_file log_file pid nats_server started=()
 
   validate_lab "$lab"
-  require_configs "$lab"
+  require_configs "$lab" "$config_dir"
   nats_server="$(resolve_tool nats-server)" || {
     printf 'nats-server not found; run ./workshop.sh setup\n' >&2
     return 1
   }
 
-  maybe_stop_current_for "$lab"
+  maybe_stop_current_for "$lab" "$config_dir"
 
-  dir="$(run_dir "$lab")"
+  dir="$(run_dir "$lab" "$config_dir")"
   mkdir -p "$dir"
 
   if run_dir_has_processes "$dir"; then
-    printf '%s is already running\n' "$(lab_title "$lab")"
-    write_current "$lab" "$dir"
-    status_lab "$lab"
+    printf '%s is already running\n' "$(target_title "$lab" "$config_dir")"
+    write_current "$lab" "$config_dir" "$dir"
+    status_lab "$lab" "$config_dir"
     return
   fi
 
@@ -833,12 +912,11 @@ start_lab() {
   fi
 
   while IFS='|' read -r name workdir conf; do
-    abs_workdir="$(lab_dir "$workdir")"
     pid_file="$dir/$name.pid"
     log_file="$dir/$name.log"
 
     (
-      cd "$abs_workdir"
+      cd "$workdir"
       if [[ "$trace" -eq 1 ]]; then
         exec "$nats_server" -c "$conf" --trace
       else
@@ -852,36 +930,38 @@ start_lab() {
     if ! is_running "$pid"; then
       printf '%s exited while starting; last log lines:\n' "$name" >&2
       tail -n 20 "$log_file" >&2 || true
-      stop_run_dir "$lab" "$dir" || true
+      stop_run_dir "$lab" "$dir" "$config_dir" || true
       return 1
     fi
 
     started+=("$name")
     printf '%-5s started pid=%s log=%s\n' "$name" "$pid" "$log_file"
-  done < <(server_specs "$lab")
+  done < <(server_specs "$lab" "$config_dir")
 
-  write_current "$lab" "$dir"
-  printf 'current lab: %s\n' "$(lab_title "$lab")"
-  status_lab "$lab"
+  write_current "$lab" "$config_dir" "$dir"
+  printf 'current lab: %s\n' "$(target_title "$lab" "$config_dir")"
+  status_lab "$lab" "$config_dir"
 }
 
 stop_lab() {
   local lab="$1"
+  local config_dir="${2:-}"
   local dir
 
   validate_lab "$lab"
-  dir="$(run_dir "$lab")"
-  stop_run_dir "$lab" "$dir"
-  clear_current_if "$lab"
+  dir="$(run_dir "$lab" "$config_dir")"
+  stop_run_dir "$lab" "$dir" "$config_dir"
+  clear_current_if "$lab" "$config_dir"
 }
 
 status_lab() {
   local lab="$1"
+  local config_dir="${2:-}"
   local dir name workdir conf pid_file pid found=0
 
   validate_lab "$lab"
-  dir="$(run_dir "$lab")"
-  printf '== %s ==\n' "$(lab_title "$lab")"
+  dir="$(run_dir "$lab" "$config_dir")"
+  printf '== %s ==\n' "$(target_title "$lab" "$config_dir")"
 
   while IFS='|' read -r name workdir conf; do
     found=1
@@ -896,7 +976,7 @@ status_lab() {
     else
       printf '%-5s stopped\n' "$name"
     fi
-  done < <(server_specs "$lab")
+  done < <(server_specs "$lab" "$config_dir")
 
   if [[ "$found" -eq 0 ]]; then
     printf 'no runnable NATS config found\n'
@@ -906,12 +986,13 @@ status_lab() {
 logs_lab() {
   local lab="$1"
   local server="${2:-}"
+  local config_dir="${3:-}"
   local dir
 
   validate_lab "$lab"
-  dir="$(run_dir "$lab")"
+  dir="$(run_dir "$lab" "$config_dir")"
 
-  printf '== %s logs ==\n' "$(lab_title "$lab")"
+  printf '== %s logs ==\n' "$(target_title "$lab" "$config_dir")"
   if [[ -n "$server" ]]; then
     [[ -f "$dir/$server.log" ]] || {
       printf 'log not found: %s\n' "$dir/$server.log" >&2
@@ -925,7 +1006,7 @@ logs_lab() {
   local logs=("$dir"/*.log)
   shopt -u nullglob
   if [[ ${#logs[@]} -eq 0 ]]; then
-    printf 'no logs found for %s\n' "$(lab_title "$lab")" >&2
+    printf 'no logs found for %s\n' "$(target_title "$lab" "$config_dir")" >&2
     return 1
   fi
   tail -f "${logs[@]}"
@@ -933,25 +1014,31 @@ logs_lab() {
 
 clean_lab_runtime() {
   local lab="$1"
+  local config_dir="${2:-}"
   local dir
 
   validate_lab "$lab"
-  dir="$(run_dir "$lab")"
-  stop_run_dir "$lab" "$dir"
+  dir="$(run_dir "$lab" "$config_dir")"
+  stop_run_dir "$lab" "$dir" "$config_dir"
   rm -rf "$dir" "$(lab_dir "$lab")/js"
-  clear_current_if "$lab"
-  printf 'cleaned %s\n' "$(lab_title "$lab")"
+  clear_current_if "$lab" "$config_dir"
+  printf 'cleaned %s\n' "$(target_title "$lab" "$config_dir")"
 }
 
 clean_lab() {
   local lab="$1"
+  local config_dir="${2:-}"
 
-  clean_lab_runtime "$lab"
+  clean_lab_runtime "$lab" "$config_dir"
   remove_contexts_if_possible
 }
 
 clean_all() {
   local lab
+
+  if current_running; then
+    stop_run_dir "$CURRENT_LAB" "$CURRENT_RUN_DIR" "${CURRENT_CONFIG_DIR:-}"
+  fi
 
   while IFS= read -r lab; do
     clean_lab_runtime "$lab"
@@ -993,7 +1080,7 @@ main() {
         exit 2
       }
       target_from_start_args "$@"
-      start_lab "$TARGET_LAB" "$START_TRACE"
+      start_lab "$TARGET_LAB" "$START_TRACE" "$START_CONFIG_DIR"
       ;;
     restart)
       [[ $# -ge 1 ]] || {
@@ -1001,8 +1088,8 @@ main() {
         exit 2
       }
       target_from_start_args "$@"
-      stop_lab "$TARGET_LAB"
-      start_lab "$TARGET_LAB" "$START_TRACE"
+      stop_lab "$TARGET_LAB" "$START_CONFIG_DIR"
+      start_lab "$TARGET_LAB" "$START_TRACE" "$START_CONFIG_DIR"
       ;;
     stop)
       [[ $# -le 1 ]] || {
@@ -1010,7 +1097,7 @@ main() {
         exit 2
       }
       target_from_args_or_current "${1:-}"
-      stop_lab "$TARGET_LAB"
+      stop_lab "$TARGET_LAB" "$TARGET_CONFIG_DIR"
       ;;
     status)
       [[ $# -le 1 ]] || {
@@ -1018,7 +1105,7 @@ main() {
         exit 2
       }
       target_from_args_or_current "${1:-}"
-      status_lab "$TARGET_LAB"
+      status_lab "$TARGET_LAB" "$TARGET_CONFIG_DIR"
       ;;
     logs)
       [[ $# -le 2 ]] || {
@@ -1026,7 +1113,7 @@ main() {
         exit 2
       }
       target_from_logs_args "${1:-}" "${2:-}"
-      logs_lab "$TARGET_LAB" "$LOG_SERVER"
+      logs_lab "$TARGET_LAB" "$LOG_SERVER" "$TARGET_CONFIG_DIR"
       ;;
     clean)
       [[ $# -le 1 ]] || {
@@ -1037,7 +1124,7 @@ main() {
         clean_all
       else
         target_from_args_or_current "${1:-}"
-        clean_lab "$TARGET_LAB"
+        clean_lab "$TARGET_LAB" "$TARGET_CONFIG_DIR"
       fi
       ;;
     *)
