@@ -11,6 +11,7 @@ starts the same `nats-server -c <config>` commands shown in the lab READMEs.
 - NATS server 2.12+ for most labs; 2.14+ is recommended.
 - NATS CLI.
 - `jq` for the inspection commands used in several labs.
+- Go (for some labs)
 - Bash, for the local process helper.
 
 ## NATS CLI Contexts
@@ -54,6 +55,7 @@ See [Lab 00 - Setup](Lab%2000%20-%20Setup/README.md) for the original setup note
 | [Lab 17 - Device Republish](Lab%2017%20-%20Device%20Republish/README.md) | Target devices individually with stream republish |
 | [Lab 18 - Leaf Connect Disconnect](Lab%2018%20-%20Leaf%20Connect%20Disconnect/README.md) | Hot reload leaf connection changes |
 | [Lab 19 - JWT Default User](Lab%2019%20-%20JWT%20Default%20User/README.md) | Decentralized auth default user behavior |
+| [Lab 20 - Muxed Request Responders](Lab%2020%20-%20Muxed%20Request%20Responders/README.md) | Use one wildcard subscription to mux request handlers |
 
 ## Run With Local NATS Servers
 
@@ -80,11 +82,27 @@ nats-server -c l2.conf
 nats-server -c l3.conf
 ```
 
-The script accepts lab numbers, `labN` ids, or formal directory names.
-
 Runtime pid files and logs are written under the repository `.workshop/`
 directory. `./workshop.sh logs` follows the current running lab's logs and
 prints the lab name at the top of the output.
+
+## Observe Monitoring Endpoints
+
+The monitor gives a watch-like view of `/varz` and `/leafz?subs=1`
+
+```sh
+scripts/monitor.sh
+scripts/monitor.sh --once
+scripts/monitor.sh --interval 5
+```
+
+## Shared Tools
+
+- [subscription-load](tools/subscription-load/README.md): creates many unique
+  subscriptions and holds them open.
+
+- [responders](tools/responders/README.md): hosts simulated request
+  responders with and without muxing.
 
 ## Cleanup
 

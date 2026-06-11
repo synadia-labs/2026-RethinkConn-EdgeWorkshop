@@ -12,6 +12,7 @@
 - nats-server --> NATS 2.12+ is enough in most cases. Some of the JetStream examples may require NATS 2.14+, so better get that one if possible.
 - nats-cli --> get latest 0.4.x
 - jq
+- Go (for some labs)
 - terminal --> (we assume Linux or macOS). Windows WSL should work but is untested.
 
 ---
