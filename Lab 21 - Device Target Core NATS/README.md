@@ -306,7 +306,7 @@ nats --context hub reply "lx2h.*.bar-service" "Response from the HUB to: {{Reque
 # pay attention to the subjects received in the requests and the subject for the responses
 nats --context hub sub '>'    # blocks!
 
-# A device in leaf #1 will still get the response thanks to the hub mapping edge.> --> lx2
+# A device in leaf #1 will still get the response thanks to the hub mapping edge.> --> h2lx.ALL.>
 nats --context l1 request lx2h.bar-service "hi from device 123 at leaf #1" --inbox-prefix edge.foo.123
 # same in any other leaf
 nats --context l2 request lx2h.bar-service "hi from device 456 at leaf #2" --inbox-prefix edge.foo.456
