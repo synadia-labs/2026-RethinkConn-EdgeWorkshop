@@ -6,10 +6,13 @@ Summary:
 - Mimics core NATS SLA, no ACKS, best effort. Can easily be adapter for higher SLA.
 - Each edge/leaf microcell has a small stream that muxes interest from all the devices into a single subject subscription
 - Stream republish is used to demux the messages and target the devices
+- It allows addressing devices in specific leafs (L1, L2...) or a broadcast to all leafs if location is unknown (ALL)
 
 Limitations:
 
-- No direct support for reply subjects. Reply subjects must be specified in the payload or implicitly defined somewhere else, and replies published separately.
+- No direct support for reply subjects: Reply subjects must be specified in the payload or implicitly defined somewhere else, and replies published separately.
+
+- Sub-efficiency to keep in mind: messages targeting non existing devices will still flow hub-to-edge to the republish-stream. The edge will efficiently discard the message on republish, as there is no device subscriber, but the traffic from hub will still flow to the edge, incurring in some wasted bandwidth and stream allocation.
 
 ---
 
@@ -18,7 +21,7 @@ Limitations:
 Start the lab:
 
 ```sh
-../workshop.sh start "Lab 17 - Device Republish"
+../workshop.sh start "Lab 17 - Device Target Republish"
 ```
 
 Direct equivalent, from this lab directory:

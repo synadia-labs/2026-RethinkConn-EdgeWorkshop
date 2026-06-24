@@ -52,10 +52,11 @@ See [Lab 00 - Setup](Lab%2000%20-%20Setup/README.md) for the original setup note
 | [Lab 14 - Remote Leaf Streams](Lab%2014%20-%20Remote%20Leaf%20Streams/README.md) | Hub remote access to leaf streams |
 | [Lab 15 - Stream Sources](Lab%2015%20-%20Stream%20Sources/README.md) | Hub sources and merges leaf streams |
 | [Lab 16 - Explicit Consumers](Lab%2016%20-%20Explicit%20Consumers/README.md) | Hub sources and merges leaf streams with explicit consumers |
-| [Lab 17 - Device Republish](Lab%2017%20-%20Device%20Republish/README.md) | Target devices individually with stream republish |
+| [Lab 17 - Device Target Republish](Lab%2017%20-%20Device%20Target%20Republish/README.md) | Target devices individually with stream republish |
 | [Lab 18 - Leaf Connect Disconnect](Lab%2018%20-%20Leaf%20Connect%20Disconnect/README.md) | Hot reload leaf connection changes |
 | [Lab 19 - JWT Default User](Lab%2019%20-%20JWT%20Default%20User/README.md) | Decentralized auth default user behavior |
 | [Lab 20 - Muxed Request Responders](Lab%2020%20-%20Muxed%20Request%20Responders/README.md) | Use one wildcard subscription to mux request handlers |
+| [Lab 21 - Device Target Core NATS](Lab%2021%20-%20Device%20Target%20Core%20NATS/README.md) | Target devices individually (core nats) |
 
 ## Run With Local NATS Servers
 
