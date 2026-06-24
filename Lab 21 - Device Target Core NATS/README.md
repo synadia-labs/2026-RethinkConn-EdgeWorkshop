@@ -289,8 +289,37 @@ sleep 1
 nats --context l3 request lx2h.bar-service "hi from device 789 at leaf #3" --inbox-prefix edge.bar.789
 ```
 
-No interest prop will happen toward the hub, that will be happy to handle a huge number of edges/devices without getting stressed with tons of inbox interests around.
+No interest prop. will happen towards the hub, that will be happy to handle a huge number of edges/devices without getting stressed with tons of inbox interests flying around.
 
-All the needed machinery is invisible for the devices, at the cost of some complexity on the hub side (tweaking the reply-to subjects).
+All the needed machinery is invisible for the devices, at the cost of some complexity on the hub side: tweaking the reply-to subjects.
+
+For those hub services that can't tweak the reply-to subjects, such as JetStream services in the hub (ie. accessing from the leafs to streams/kv in the hub), or services built with the nats-micro framework, or in general for any other case where we don't have the chance to modify the reply-to subject, we still have a final trick: we can define a mapping in the hub account, to convert the prefix that devices use for their leaf-local inbox (`edge.>`) to the broadcast prefix that the hub can use to address any leaf (`lx2h.ALL.>`). That will do the magic and allow the reply to still get to the device at *any* leaf!
+
+Check the mapping in the hub server config file. And test how this works:
+
+```sh
+# A hub service that knows nothing about tweaking reply-to subjects
+# We still use the lx2h.* prefix, but the service can't really do anything with the injected leaf id token
+nats --context hub reply "lx2h.*.bar-service" "Response from the HUB to: {{Request}}"   # blocks!
+
+# In a separate terminal, monitor what happens in the hub
+# pay attention to the subjects received in the requests and the subject for the responses
+nats --context hub sub '>'    # blocks!
+
+# A device in leaf #1 will still get the response thanks to the hub mapping edge.> --> lx2
+nats --context l1 request lx2h.bar-service "hi from device 123 at leaf #1" --inbox-prefix edge.foo.123
+# same in any other leaf
+nats --context l2 request lx2h.bar-service "hi from device 456 at leaf #2" --inbox-prefix edge.foo.456
+```
+
+Being a broadcast it will actually hit all the leafs, so not a perfect solution. The security aspect can be addressed by properly setting edge device permissions (ie. device 123 should only be allowed to subscribe to `edge.foo.123.>` or similar). But we still have the wasted traffic hitting every leaf, keep that in mind and don't abuse this final trick.
+
+JStreams is not enabled in this lab, but if it were, and the leafs are authorized to hit the `$JS.HUB.API.>` API in the HUB domain, something like this will also work:
+
+```sh
+nats --context l1 stream ls --domain=HUB --inbox-prefix edge.foo.123
+```
+
+I leave to you setting up JetStreams and API permissions to make it work!
 
 ---
